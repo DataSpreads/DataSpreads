@@ -1,0 +1,71 @@
+<Project>
+  <PropertyGroup Label="BasePath">
+    <SolutionDir Condition="'$(SolutionDir)'==''">$(MSBuildThisFileDirectory)..\</SolutionDir>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Product>DataSpreads!</Product>
+    <Authors>Victor Baybekov</Authors>
+    <Company>DataSpreads!io</Company>
+    <Copyright>Victor Baybekov 2017-2019</Copyright>
+    <NeutralLanguage>en-US</NeutralLanguage>
+
+    <VersionPrefix>"This is invalid placeholder version. Proper version must be set in common.props or with cli command"</VersionPrefix>
+
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/DataSpreads/DataSpreads.git</RepositoryUrl>
+
+    <!-- The SPDX name for the source license. See https://spdx.org/licenses/. -->
+    <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
+    <!--<PackageLicenseFile>LICENSE</PackageLicenseFile>-->
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+
+    <MaintainerEmail>DataSpreads@DataSpreads.io</MaintainerEmail>
+    <!-- TODO setup redirect from dataspreads.dev to this page -->
+    <PackageProjectUrl>https://docs.dataspreads.io</PackageProjectUrl>
+    <PackageIconUrl>https://raw.githubusercontent.com/DataSpreads/Docs/master/images/DataSpreads_icon_64_64.png</PackageIconUrl>
+    <PackageTags>DataSpreads;Spreads;realtime;timeseries;data</PackageTags>
+
+    <IncludeSource>false</IncludeSource>
+    <DebugType>embedded</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn),1591</NoWarn>
+    <SignAssembly>true</SignAssembly>
+    <DelaySign>false</DelaySign>
+    <PublicSign Condition=" '$(OS)' != 'Windows_NT' ">true</PublicSign>
+    <AssemblyOriginatorKeyFile>..\..\build\DataSpreadsKey.snk</AssemblyOriginatorKeyFile>
+    
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <DebugSymbols>true</DebugSymbols>
+    <LangVersion>7.3</LangVersion>
+    <Configurations>Debug;Release</Configurations>
+
+  </PropertyGroup>
+
+  <!-- Warnings and errors -->
+  <PropertyGroup>
+    <!-- TODO true -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!--
+      Suppress NuGet warning about upcoming deprecation of PackageLicenseUrl.
+    -->
+    <NoWarn>$(NoWarn);NU5125</NoWarn>
+    <!-- Suppress NuGet warnings about using SemVer 2.0. -->
+    <NoWarn>$(NoWarn);NU5105</NoWarn>
+    <!-- Don't make missing XML docs a fatal build error, but still surface so we have visibility into undocumented APIs. -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);CS1591</WarningsNotAsErrors>
+   
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'netcoreapp2.1' or '$(TargetFramework)' == 'netcoreapp3.0'">
+    <DefineConstants>$(DefineConstants);NETCOREAPP</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+    <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
+    <DefineConstants>$(DefineConstants);TRACE;DEBUG</DefineConstants>
+  </PropertyGroup>
+</Project>

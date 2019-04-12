@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <Import Project="..\..\build\common.props" />
+    <PropertyGroup>
+        <TargetFrameworks>netcoreapp3.0</TargetFrameworks>
+        <AssemblyName>DataSpreads.Core.Tests</AssemblyName>
+        <RootNamespace>DataSpreads.Tests</RootNamespace>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="HdrHistogram" Version="2.5.0" />
+        <PackageReference Include="Microsoft.CSharp" Version="4.6.0-preview1-27018-01" />
+        <PackageReference Include="Nerdbank.Streams" Version="2.1.37" />
+        <PackageReference Include="ObjectLayoutInspector" Version="0.1.1" />
+        <PackageReference Include="Spreads.Core" Version="2019.0.412" />
+        <PackageReference Include="System.Numerics.Vectors" Version="4.6.0-preview1-27018-01" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.0.1" />
+        <PackageReference Include="NUnit" Version="3.11.0" />
+        <PackageReference Include="NUnit3TestAdapter" Version="3.13.0" />
+    </ItemGroup>
+    <ItemGroup>
+      <ProjectReference Include="..\..\src\DataSpreads.Core\DataSpreads.Core.csproj" />
+    </ItemGroup>
+</Project>

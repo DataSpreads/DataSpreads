@@ -1,0 +1,8 @@
+version: '3.4'
+
+services:
+  dataspreads.tests.run:
+    image: ${DOCKER_REGISTRY}dataspreadstestsrun
+    build:
+      context: .
+      dockerfile: ../DataSpreads.Tests.Run/Dockerfile

@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\build\common.props" />
+  <PropertyGroup>
+    <Description>DataSpreads! Core library</Description>
+    <AssemblyName>DataSpreads.Core</AssemblyName>
+    <RootNamespace>DataSpreads</RootNamespace>
+    <PackageId>DataSpreads.Core</PackageId>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|netstandard2.0|AnyCPU'">
+    <DefineConstants>TRACE;TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="SharedLog\**" />
+    <EmbeddedResource Remove="SharedLog\**" />
+    <None Remove="SharedLog\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="1.60.6" />
+    <PackageReference Include="Spreads" Version="2019.0.412" />
+    <PackageReference Include="Spreads.LMDB" Version="2019.0.412" />
+    <PackageReference Include="Spreads.SQLite" Version="2019.1.412" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DataSpreads.Security\DataSpreads.Security.csproj" />
+  </ItemGroup>
+
+</Project>

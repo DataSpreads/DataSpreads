@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <Import Project="..\..\build\common.props" />
+    <PropertyGroup>
+        <TargetFrameworks>netcoreapp3.0</TargetFrameworks>
+        <AssemblyName>DataSpreads.Security.Tests</AssemblyName>
+        <RootNamespace>DataSpreads.Tests</RootNamespace>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="HdrHistogram" Version="2.5.0" />
+        <PackageReference Include="Microsoft.CSharp" Version="4.6.0-preview1-27018-01" />
+        <PackageReference Include="ObjectLayoutInspector" Version="0.1.1" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.0.1" />
+        <PackageReference Include="NUnit" Version="3.11.0" />
+        <PackageReference Include="NUnit3TestAdapter" Version="3.13.0" />
+        <PackageReference Include="NSec.Cryptography" Version="19.1.0-preview1" />
+        <PackageReference Include="Portable.BouncyCastle" Version="1.8.5" />
+        <PackageReference Include="SauceControl.Blake2Fast" Version="0.2.0" />
+        <PackageReference Include="Spreads.Core" Version="2019.0.412" />
+    </ItemGroup>
+    <ItemGroup>
+      <ProjectReference Include="..\..\src\DataSpreads.Security\DataSpreads.Security.csproj" />
+    </ItemGroup>
+</Project>

@@ -1,0 +1,19 @@
+# ASP.NET Core
+# Build and test ASP.NET Core projects targeting .NET Core.
+# Add steps that run tests, create a NuGet package, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+
+pool:
+  vmImage: 'vs2017-win2016'
+
+variables:
+  buildConfiguration: 'Release'
+
+steps:
+
+- task: DotNetCoreInstaller@0
+  inputs:
+    version: '2.1.500' # replace this value with the version that you need for your project
+
+- script: dotnet test test/DataSpreads.Core.Tests/DataSpreads.Core.Tests.csproj -c Release --filter TestCategory=CI -v n
+  displayName: 'Test Release'

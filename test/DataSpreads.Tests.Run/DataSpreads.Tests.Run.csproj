@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    
+    <TargetFramework>netcoreapp3.0</TargetFramework>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <Configurations>Debug;Release;Publish</Configurations>
+    <OutputType>Exe</OutputType>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- Server GC shows very few collections, deceptive when on. -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <!-- 
+      Hot code must be marked with AggressiveOptimization so that
+      tiered compilation does not kill performance. For warmup
+      example to enable JIT static optimization see Spreads.BinarySerialization
+    -->
+    <TieredCompilation>False</TieredCompilation>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DataSpreads.Core.Tests\DataSpreads.Core.Tests.csproj" />
+    <ProjectReference Include="..\DataSpreads.Security.Tests\DataSpreads.Security.Tests.csproj" />
+  </ItemGroup>
+
+</Project>

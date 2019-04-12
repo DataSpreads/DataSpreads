@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\build\common.props" />
+  <PropertyGroup>
+    <Description>DataSpreads! main library.</Description>
+    <AssemblyName>DataSpreads</AssemblyName>  
+    <RootNamespace>DataSpreads</RootNamespace>
+    <PackageId>DataSpreads</PackageId>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Spreads" Version="2019.0.412" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DataSpreads.Core\DataSpreads.Core.csproj" />
+  </ItemGroup>
+</Project>
