@@ -6,10 +6,33 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using Spreads.Serialization;
 
 namespace CrossProcess
 {
+    [StructLayout(LayoutKind.Sequential)]
+    [BinarySerialization(8)]
+    public struct Message
+    {
+        public long Field1;
+        //public long Field2;
+        //public long Field3;
+        //public long Field4;
+        //public long Field5;
+        //public long Field6;
+        //public long Field7;
+        //public long Field8;
+
+        public Message(long value)
+        {
+            this = default;
+            Field1 = value;
+        }
+    }
+
+
     internal class Program
     {
         private static DataStore DS;
@@ -50,9 +73,9 @@ namespace CrossProcess
             for (int i = 0; i < StreamCount; i++)
             {
                 // CreateStreamAsync returns true is a stream was created or false if a stream already existed
-                var _ = await Repo.CreateStreamAsync<int>($"req_{i}", new Metadata($"Request stream {i}"),
+                var _ = await Repo.CreateStreamAsync<Message>($"req_{i}", new Metadata($"Request stream {i}"),
                     DataStreamCreateFlags.Binary).ConfigureAwait(false);
-                await Repo.CreateStreamAsync<int>($"res_{i}", new Metadata($"Response stream {i}"),
+                await Repo.CreateStreamAsync<Message>($"res_{i}", new Metadata($"Response stream {i}"),
                     DataStreamCreateFlags.Binary).ConfigureAwait(false);
             }
 
@@ -76,7 +99,7 @@ namespace CrossProcess
                 else
                 {
                     // TODO Currently races in Packer when run from separate processes.
-#if !XXX
+#if XXX
                     var req = Requester();
                     var res = Responder();
                     await req.ConfigureAwait(false);
@@ -140,15 +163,15 @@ namespace CrossProcess
 
         public static async Task Requester(int id)
         {
-            using (var req = (await Repo.OpenStreamWriterAsync<int>($"req_{id}", WriteMode.LocalSync,
+            using (var req = (await Repo.OpenStreamWriterAsync<Message>($"req_{id}", WriteMode.LocalSync,
                 bytesPerMinuteHint: 8000_000).ConfigureAwait(false)).WithTimestamp(KeySorting.NotEnforced))
-            using (var res = await Repo.OpenStreamAsync<int>($"res_{id}").ConfigureAwait(false))
+            using (var res = await Repo.OpenStreamAsync<Message>($"res_{id}").ConfigureAwait(false))
             {
                 var reqT = Task.Run(async () =>
                 {
                     for (int i = 0; i < ItemsPerStreamCount; i++)
                     {
-                        var version = await req.TryAppend(i, Timestamp.Now).ConfigureAwait(false);
+                        var version = await req.TryAppend(new Message(i), Timestamp.Now).ConfigureAwait(false);
                         if (version == 0)
                         {
                             throw new Exception("Cannot append to req stream");
@@ -200,8 +223,8 @@ namespace CrossProcess
 
         public static async Task Responder(int id)
         {
-            using (var req = await Repo.OpenStreamAsync<int>($"req_{id}"))
-            using (var res = await Repo.OpenStreamWriterAsync<int>($"res_{id}", WriteMode.LocalSync,
+            using (var req = await Repo.OpenStreamAsync<Message>($"req_{id}"))
+            using (var res = await Repo.OpenStreamWriterAsync<Message>($"res_{id}", WriteMode.LocalSync,
                 bytesPerMinuteHint: 8000_000))
             {
                 var t = Task.Run(async () =>
@@ -209,7 +232,7 @@ namespace CrossProcess
                     var i = 0;
                     await foreach (var keyValuePair in req) // Note: Async stream
                     {
-                        await res.TryAppend(keyValuePair.Value.Value * 2).ConfigureAwait(false);
+                        await res.TryAppend(new Message(keyValuePair.Value.Value.Field1 * 2)).ConfigureAwait(false);
                         i++;
                         if (i == ItemsPerStreamCount)
                         {
