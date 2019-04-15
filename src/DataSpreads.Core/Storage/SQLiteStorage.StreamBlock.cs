@@ -165,8 +165,9 @@ namespace DataSpreads.Storage
             {
                 return Put(in blockView) > 0;
             }
-            catch
+            catch(Exception ex)
             {
+                ThrowHelper.FailFast("EX in TryPutStreamBlock: " + ex);
                 return false;
             }
         }
@@ -186,6 +187,19 @@ namespace DataSpreads.Storage
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public (bool inserted, long storageId) InsertBlock(in StreamBlock blockView)
         {
+            // This adds nothing to simple inserts. TODO remove
+            //using (var txn = BeginConcurrent())
+            //{
+            //    try
+            //    {
+            //        return txn.Queries.InsertBlock(in blockView);
+            //    }
+            //    finally
+            //    {
+            //        txn.RawCommit();
+            //    }
+            //}
+
             var qs = RentQueries();
             try
             {
@@ -349,7 +363,7 @@ namespace DataSpreads.Storage
 
                         if ((rc = binder.BindBlob(blobColumn, ptrBlob, lenBlob)) != 0)
                         {
-                            ThrowHelper.FailFast("Cannot bind chunk blob: " + rc);
+                            ThrowHelper.FailFast("Cannot bind block blob: " + rc);
                         }
                     }, (chunk: blockView, ptr, blobSize));
 
@@ -361,16 +375,17 @@ namespace DataSpreads.Storage
                         }
 
                         var changes = reader.Changes();
-                        if (changes == 0)
+                        if (changes != 1)
                         {
-                            Trace.TraceWarning("Cannot insert StreamBlock");
+                            Trace.TraceWarning($"Cannot insert StreamBlock: changes = {changes}");
                         }
+                        
                         return (changes == 1, reader.LastRowId());
                     }, (object)null);
                 }
                 catch (Exception ex)
                 {
-                    ThrowHelper.FailFast("Cannot insert chunk: " + ex);
+                    ThrowHelper.FailFast("Cannot insert block: " + ex);
                     return (false, 0);
                 }
                 finally

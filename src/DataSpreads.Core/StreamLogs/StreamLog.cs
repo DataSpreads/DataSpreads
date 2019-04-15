@@ -107,6 +107,8 @@ namespace DataSpreads.StreamLogs
 
         private readonly string _textId;
 
+        private Task _batchWriteTask;
+
         internal StreamLog(StreamLogManager streamLogManager,
             StreamLogState state,
             int ratePerMinuteHint = 0,
@@ -687,6 +689,8 @@ namespace DataSpreads.StreamLogs
 #pragma warning restore 618
             }
 
+            _batchWriteTask?.Wait();
+
             var block = BlockIndex.RentNextWritableBlock(this, length, nextVersion, nextTimestamp);
 
             if (!block.IsInitialized)
@@ -714,8 +718,11 @@ namespace DataSpreads.StreamLogs
                 // compared to compression ratio improvement, but often
                 // we do not care about slower load stage if we could still
                 // save non-negligible space. Decompression is fast for any level.
-
-                var _ = StreamLogManager.Packer.TryPackBlocks(Slid);
+                
+                _batchWriteTask = Task.Run(() =>
+                {
+                    var _ = StreamLogManager.Packer.TryPackBlocks(Slid);
+                });
             }
             else
             {

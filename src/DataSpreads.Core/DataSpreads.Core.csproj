@@ -19,7 +19,7 @@
 
   <ItemGroup>
     <PackageReference Include="Dapper" Version="1.60.6" />
-    <PackageReference Include="Spreads" Version="2019.0.412" />
+    <PackageReference Include="Spreads" Version="2019.0.415-build142424" />
     <PackageReference Include="Spreads.LMDB" Version="2019.0.412" />
     <PackageReference Include="Spreads.SQLite" Version="2019.1.412" />
   </ItemGroup>

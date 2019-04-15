@@ -31,6 +31,7 @@ using Spreads.Collections.Concurrent;
 using Spreads.SQLite;
 using Spreads.SQLite.Fast;
 using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -49,32 +50,14 @@ namespace DataSpreads.Storage
 
         private readonly ConnectionPool _connectionPool;
 
-        private readonly LockedObjectPool<StorageQueries> _queriesObjectPool;
-
+        // private readonly LockedObjectPool<StorageQueries> _queriesObjectPool;
+        private readonly BlockingCollection<StorageQueries> _queriesObjectPool;
+        private int _allocCount;
         public SQLiteStorage(string connectionString)
         {
             _connectionPool = new ConnectionPool(connectionString);
-            // _queriesObject = new SqLiteQueries(_connectionPool.Rent(), _connectionPool);
-            _queriesObjectPool = new LockedObjectPool<StorageQueries>(Environment.ProcessorCount * 2,
-                () => new StorageQueries(_connectionPool.Rent(), _connectionPool));
+            _queriesObjectPool= new BlockingCollection<StorageQueries>(new ConcurrentBag<StorageQueries>(), Environment.ProcessorCount);
         }
-
-        //public (bool, long) InsertChunks(StreamLogChunk slc)
-        //{
-        //    var qs = RentQueries();
-        //    try
-        //    {
-        //        qs.Begin();
-        //        var result = qs.InsertChunk(slc);
-        //        qs.InsertChunk(slc);
-        //        qs.Commit();
-        //        return result;
-        //    }
-        //    finally
-        //    {
-        //        ReturnQueries(qs);
-        //    }
-        //}
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Transaction Begin()
@@ -148,16 +131,34 @@ namespace DataSpreads.Storage
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private StorageQueries RentQueries()
         {
-            return _queriesObjectPool.Rent();
+            if (_queriesObjectPool.TryTake(out var qs))
+            {
+                return qs;
+            }
+
+            if (_allocCount >= Environment.ProcessorCount)
+            {
+                return _queriesObjectPool.Take();
+            }
+
+            Interlocked.Increment(ref _allocCount);
+            return new StorageQueries(_connectionPool.Rent(), _connectionPool);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ReturnQueries(StorageQueries queriesObject)
         {
-            if (!_queriesObjectPool.Return(queriesObject))
+            if (!_queriesObjectPool.TryAdd(queriesObject))
             {
+                Console.WriteLine("Disposing queries");
                 queriesObject.Dispose();
             }
+
+            //if (!_queriesObjectPool.Return(queriesObject))
+            //{
+            //    Console.WriteLine("Disposing queries");
+            //    queriesObject.Dispose();
+            //}
         }
 
         public void Dispose()

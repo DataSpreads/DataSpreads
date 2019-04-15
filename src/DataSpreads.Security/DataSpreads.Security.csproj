@@ -9,6 +9,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="libsodium" Version="1.0.17" />
-    <PackageReference Include="Spreads.Core" Version="2019.0.412" />
+    <PackageReference Include="Spreads.Core" Version="2019.0.415-build142424" />
   </ItemGroup>
 </Project>

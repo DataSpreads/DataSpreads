@@ -54,7 +54,7 @@ namespace CrossProcess
             // Traces ctor stack of leaked buffers. Slow and should normally be off.
             Settings.DoDetectBufferLeaks = false;
 
-            // Bound checks and other correcntess checks. Fast and should be ON until the lib is stable.
+            // Bound checks and other correctness checks. Fast and should be ON until the lib is stable.
             Settings.DoAdditionalCorrectnessChecks = false;
 
             var path = Path.GetFullPath("./data_stores");

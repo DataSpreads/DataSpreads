@@ -9,6 +9,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using CrossProcess;
 
 namespace Ingest
 {
@@ -49,15 +50,17 @@ namespace Ingest
 
         private static int StreamCount = 100;
 
-        private const int ItemCount = 100_000_000;
+        private const int ItemCount = 10_000_000;
         private static long TotalCount = 0;
 
         private static async Task Main(string[] args)
         {
-            Settings.DoDetectBufferLeaks = false;
+            Trace.Listeners.Add(new ConsoleListener());
+            Settings.ZstdCompressionLevel = 1;
+            Settings.DoDetectBufferLeaks = true;
 
-            // Bound checks and other correcntess checks. Fast and should be ON until the lib is stable.
-            Settings.DoAdditionalCorrectnessChecks = false;
+            // Bound checks and other correctness checks. Fast and should be ON until the lib is stable.
+            Settings.DoAdditionalCorrectnessChecks = true;
 
             var path = Path.GetFullPath("G:/sample_data_stores/ingest");
 
@@ -83,7 +86,8 @@ namespace Ingest
 
             for (int i = 0; i < StreamCount; i++)
             {
-                var streamWriter = (await Repo.OpenStreamWriterAsync<Payload>($"payload_{i}", WriteMode.BatchWrite)
+                var streamWriter = (await Repo.OpenStreamWriterAsync<Payload>($"payload_{i}", 
+                        WriteMode.BatchWrite)
                     .ConfigureAwait(false)).WithTimestamp(KeySorting.NotEnforced);
 
                 streams.Add(streamWriter);
@@ -99,7 +103,7 @@ namespace Ingest
                 {
                     for (int j = 0; j < ItemCount; j++)
                     {
-                        await sw.TryAppend(Payload.Create(), Timestamp.Now);
+                        await sw.TryAppend(Payload.Create(), new Timestamp(Timestamp.Now.Millis));
                         Interlocked.Increment(ref TotalCount);
                     }
                 }));

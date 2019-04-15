@@ -107,6 +107,8 @@ namespace DataSpreads.StreamLogs
             bool disablePacker = false,
             IStreamBlockStorage blockStorage = null)
         {
+            Spreads.Buffers.BufferPool.PinnedArrayMemoryPool.AddStackTraceOnRent = true;
+
             DataStorePath = dataStorePath ?? Path.Combine(processConfig.DataRootPath, dataStoreName);
 
             ProcessConfig = processConfig;

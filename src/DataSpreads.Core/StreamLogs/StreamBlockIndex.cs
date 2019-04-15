@@ -449,35 +449,38 @@ namespace DataSpreads.StreamLogs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool UpdateBlockRecord(StreamLogId slid, StreamBlockRecord value)
         {
-            using (var txn = _env.BeginTransaction(TransactionBeginFlags.NoSync))
+            lock (_env)
             {
-                var streamId = (long)slid;
-
-                var result = false;
-                using (var cursor = _blocksDb.OpenCursor(txn))
+                using (var txn = _env.BeginTransaction(TransactionBeginFlags.NoSync))
                 {
-                    StreamBlockRecord record = value;
-                    if (cursor.TryGet(ref streamId, ref record, CursorGetOption.GetBoth))
+                    var streamId = (long)slid;
+
+                    var result = false;
+                    using (var cursor = _blocksDb.OpenCursor(txn))
                     {
-                        if (record.Version != value.Version)
+                        StreamBlockRecord record = value;
+                        if (cursor.TryGet(ref streamId, ref record, CursorGetOption.GetBoth))
                         {
-                            FailBadVersion();
+                            if (record.Version != value.Version)
+                            {
+                                FailBadVersion();
+                            }
+
+                            result = cursor.TryPut(ref streamId, ref value, CursorPutOptions.Current);
                         }
-
-                        result = cursor.TryPut(ref streamId, ref value, CursorPutOptions.Current);
                     }
-                }
 
-                if (result)
-                {
-                    txn.Commit();
-                }
-                else
-                {
-                    txn.Abort();
-                }
+                    if (result)
+                    {
+                        txn.Commit();
+                    }
+                    else
+                    {
+                        txn.Abort();
+                    }
 
-                return result;
+                    return result;
+                }
             }
         }
 
@@ -865,7 +868,7 @@ namespace DataSpreads.StreamLogs
 
                                     if (!packed)
                                     {
-                                        
+                                        Console.WriteLine("!packed");
                                         var lastPackedInStorage = BlockStorage.LastStreamBlockKey(streamId);
                                         if (lastPackedInStorage == blockView.FirstVersion)
                                         {
@@ -1278,7 +1281,8 @@ namespace DataSpreads.StreamLogs
             ulong nextBlockFirstVersion,
             Timestamp nextBlockFirstTimestamp)
         {
-            Debug.WriteLine($"[{Thread.CurrentThread.ManagedThreadId}: {Thread.CurrentThread.Name}] Entered RentNextWritableBlock");
+            Debug.WriteLine(
+                $"[{Thread.CurrentThread.ManagedThreadId}: {Thread.CurrentThread.Name}] Entered RentNextWritableBlock");
             var streamId = (long)streamLog.Slid;
 
             // First check if there is already a prepared buffer
@@ -1300,8 +1304,12 @@ namespace DataSpreads.StreamLogs
                     Timestamp previousBlockLastTimestamp = default;
                     if (c.TryFindDup(Lookup.LE, ref streamId, ref record))
                     {
-                        ThrowHelper.AssertFailFast(streamId == (long)streamLog.Slid, "streamId == (long)streamLog.Slid");
-                        if (record.Version == CompletedVersion) { return default; }
+                        ThrowHelper.AssertFailFast(streamId == (long)streamLog.Slid,
+                            "streamId == (long)streamLog.Slid");
+                        if (record.Version == CompletedVersion)
+                        {
+                            return default;
+                        }
 
 #pragma warning disable 618
                         var lastBlockView = TryGetIndexedStreamBlockView(streamLog,
@@ -1323,11 +1331,14 @@ namespace DataSpreads.StreamLogs
 
                             SharedMemory.IncrementIndexedStreamBlock(nativeBuffer.Data);
                             var manager = SharedMemory.Create(nativeBuffer, record.BufferRef, _blockPool);
-                            var nextBlock = new StreamBlock(manager.GetBlockBuffer(streamLog.StreamLogFlags.Pow2Payload()),
+                            var nextBlock = new StreamBlock(
+                                manager.GetBlockBuffer(streamLog.StreamLogFlags.Pow2Payload()),
                                 manager, streamLog.Slid, streamLog.ItemFixedSize, lastBlockView.FirstVersion);
-                            Debug.WriteLine($"[{Thread.CurrentThread.ManagedThreadId}: {Thread.CurrentThread.Name}] RentNextWritableBlock: found non-completed existing block with first version: {nextBlock.FirstVersion}, {record.BufferRef}");
+                            Debug.WriteLine(
+                                $"[{Thread.CurrentThread.ManagedThreadId}: {Thread.CurrentThread.Name}] RentNextWritableBlock: found non-completed existing block with first version: {nextBlock.FirstVersion}, {record.BufferRef}");
                             return nextBlock;
                         }
+
                         nextVersion = lastBlockView.NextVersion;
                         previousChecksum = lastBlockView.Checksum;
                         previousBlockLastTimestamp = lastBlockView.GetLastTimestampOrDefault();
@@ -1336,11 +1347,16 @@ namespace DataSpreads.StreamLogs
                     record.Version = nextBlockFirstVersion;
                     if (c.TryFindDup(Lookup.GT, ref streamId, ref record))
                     {
-                        ThrowHelper.AssertFailFast(streamId == (long)streamLog.Slid, "streamId == (long)streamLog.Slid");
-                        if (record.Version == CompletedVersion) { return default; }
+                        ThrowHelper.AssertFailFast(streamId == (long)streamLog.Slid,
+                            "streamId == (long)streamLog.Slid");
+                        if (record.Version == CompletedVersion)
+                        {
+                            return default;
+                        }
 
 #pragma warning disable 618
-                        var lastBlockView = TryGetIndexedStreamBlockView(streamLog, in record.BufferRef, out var nativeBuffer,
+                        var lastBlockView = TryGetIndexedStreamBlockView(streamLog, in record.BufferRef,
+                            out var nativeBuffer,
                             expectedFirstVersion: 0,
                             ignoreAlreadyIndexed: true); // we took record.BufferRef from SBI
 #pragma warning restore 618
@@ -1352,10 +1368,12 @@ namespace DataSpreads.StreamLogs
                                 ThrowVersionIsNotEqualToNext(nextBlockFirstVersion, nextVersion);
                             }
 
-                            var blockBuffer = BlockMemoryPool.NativeToStreamBlockBuffer(nativeBuffer, streamLog.StreamLogFlags.Pow2Payload());
+                            var blockBuffer = BlockMemoryPool.NativeToStreamBlockBuffer(nativeBuffer,
+                                streamLog.StreamLogFlags.Pow2Payload());
 
                             // true if we are initializing the block for the first time
-                            if (StreamBlock.TryInitialize(blockBuffer, streamLog.Slid, streamLog.BlockInitialVersionAndFlags, streamLog.ItemFixedSize,
+                            if (StreamBlock.TryInitialize(blockBuffer, streamLog.Slid,
+                                streamLog.BlockInitialVersionAndFlags, streamLog.ItemFixedSize,
                                 nextBlockFirstVersion, previousChecksum, previousBlockLastTimestamp))
                             {
                                 if (record.Version != ReadyBlockVersion)
@@ -1365,14 +1383,18 @@ namespace DataSpreads.StreamLogs
 
                                 SharedMemory.IncrementIndexedStreamBlock(nativeBuffer.Data);
                                 var manager = SharedMemory.Create(nativeBuffer, record.BufferRef, _blockPool);
-                                var nextBlock = new StreamBlock(manager.GetBlockBuffer(streamLog.StreamLogFlags.Pow2Payload()), manager, streamLog.Slid,
+                                var nextBlock = new StreamBlock(
+                                    manager.GetBlockBuffer(streamLog.StreamLogFlags.Pow2Payload()), manager,
+                                    streamLog.Slid,
                                     streamLog.ItemFixedSize, lastBlockView.FirstVersion);
-                                Debug.WriteLine($"[{Thread.CurrentThread.ManagedThreadId}: {Thread.CurrentThread.Name}] RentNextWritableBlock: found+initialized prepared block with first version: {nextBlock.FirstVersion}, {manager.BufferRef}");
+                                Debug.WriteLine(
+                                    $"[{Thread.CurrentThread.ManagedThreadId}: {Thread.CurrentThread.Name}] RentNextWritableBlock: found+initialized prepared block with first version: {nextBlock.FirstVersion}, {manager.BufferRef}");
                                 return nextBlock;
                             }
                             else
                             {
-                                ThrowHelper.ThrowInvalidOperationException("WTF. Block was not initialized and then we failed to ");
+                                ThrowHelper.ThrowInvalidOperationException(
+                                    "WTF. Block was not initialized and then we failed to ");
                             }
                         }
 
@@ -1383,14 +1405,22 @@ namespace DataSpreads.StreamLogs
                         {
                             SharedMemory.IncrementIndexedStreamBlock(nativeBuffer.Data);
                             var manager = SharedMemory.Create(nativeBuffer, record.BufferRef, _blockPool);
-                            var nextBlock = new StreamBlock(manager.GetBlockBuffer(streamLog.StreamLogFlags.Pow2Payload()), manager, streamLog.Slid, streamLog.ItemFixedSize, blockVersion);
-                            Debug.WriteLine($"[{Thread.CurrentThread.ManagedThreadId}: {Thread.CurrentThread.Name}] RentNextWritableBlock: found non-completed prepared block with first version: {nextBlock.FirstVersion}, {record.BufferRef}");
+                            var nextBlock =
+                                new StreamBlock(manager.GetBlockBuffer(streamLog.StreamLogFlags.Pow2Payload()), manager,
+                                    streamLog.Slid, streamLog.ItemFixedSize, blockVersion);
+                            Debug.WriteLine(
+                                $"[{Thread.CurrentThread.ManagedThreadId}: {Thread.CurrentThread.Name}] RentNextWritableBlock: found non-completed prepared block with first version: {nextBlock.FirstVersion}, {record.BufferRef}");
                             return nextBlock;
                         }
                     }
                 }
             }
-            return RentNextWritableBlockLocked(streamLog, minimumLength, nextBlockFirstVersion, nextBlockFirstTimestamp);
+
+            lock (_env) // be nice to LMDB, use it's lock only for x-process access
+            {
+                return RentNextWritableBlockLocked(streamLog, minimumLength, nextBlockFirstVersion,
+                nextBlockFirstTimestamp);
+            }
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -1415,7 +1445,8 @@ namespace DataSpreads.StreamLogs
         )]
         private unsafe StreamBlock RentNextWritableBlockLocked(StreamLog streamLog, int minimumLength, ulong nextBlockFirstVersion, Timestamp nextBlockFirstTimestamp)
         {
-            Debug.WriteLine($"[{Thread.CurrentThread.ManagedThreadId}: {Thread.CurrentThread.Name}] Entered RentNextWritableBlockLocked");
+            Debug.WriteLine(
+                $"[{Thread.CurrentThread.ManagedThreadId}: {Thread.CurrentThread.Name}] Entered RentNextWritableBlockLocked");
 
             // Note: This is a very large method that is actually 3 or 4 methods,
             // but live with regions for now. This is the most difficult & subtle
@@ -1456,7 +1487,8 @@ namespace DataSpreads.StreamLogs
 
                             var bufferRef = record.BufferRef;
 #pragma warning disable 618
-                            lastBlockView = TryGetIndexedStreamBlockView(streamLog, in bufferRef, out var nativeBuffer,
+                            lastBlockView = TryGetIndexedStreamBlockView(streamLog, in bufferRef,
+                                out var nativeBuffer,
                                 expectedFirstVersion: 0, // we are initializing SL and do not know the version
                                 ignoreAlreadyIndexed: true); // we took record.BufferRef from SBI
 #pragma warning restore 618
@@ -1472,8 +1504,10 @@ namespace DataSpreads.StreamLogs
                                 if (record.BufferRef != bufferRef)
                                 {
 #pragma warning disable 618
-                                    lastBlockView = TryGetIndexedStreamBlockView(streamLog, in record.BufferRef, out nativeBuffer,
-                                        expectedFirstVersion: 0, // we are initializing SL and do not know the version
+                                    lastBlockView = TryGetIndexedStreamBlockView(streamLog, in record.BufferRef,
+                                        out nativeBuffer,
+                                        expectedFirstVersion:
+                                        0, // we are initializing SL and do not know the version
                                         ignoreAlreadyIndexed: true); // we took record.BufferRef from SBI
 #pragma warning restore 618
                                 }
@@ -1483,12 +1517,15 @@ namespace DataSpreads.StreamLogs
                                 Debug.Assert(newCount > 1);
 
                                 var manager = SharedMemory.Create(nativeBuffer, record.BufferRef, _blockPool);
-                                nextBlock = new StreamBlock(manager.GetBlockBuffer(streamLog.StreamLogFlags.Pow2Payload()), manager, streamLog.Slid,
+                                nextBlock = new StreamBlock(
+                                    manager.GetBlockBuffer(streamLog.StreamLogFlags.Pow2Payload()), manager,
+                                    streamLog.Slid,
                                     streamLog.ItemFixedSize, lastBlockView.FirstVersion);
                                 // Expected numbers and manager.BlockBuffer trip are not needed, checks eat cycles, even if few of them.
                                 // But good to have this to ensure that everything works. This is not in any hot loop.
 
-                                Debug.WriteLine($"[{Thread.CurrentThread.ManagedThreadId}: {Thread.CurrentThread.Name}] RentNextWritableBlockLocked: found prepared block with first version: {nextBlock.FirstVersion}, {record.BufferRef}");
+                                Debug.WriteLine(
+                                    $"[{Thread.CurrentThread.ManagedThreadId}: {Thread.CurrentThread.Name}] RentNextWritableBlockLocked: found prepared block with first version: {nextBlock.FirstVersion}, {record.BufferRef}");
 
                                 lastBlockView = default;
                                 goto ABORT;
@@ -1498,7 +1535,6 @@ namespace DataSpreads.StreamLogs
                         // empty, return invalid block
                         nextBlock = default;
                         goto ABORT;
-                        
                     }
 
                     #endregion Init (version == 0)
@@ -1517,18 +1553,22 @@ namespace DataSpreads.StreamLogs
                         }
 
 #pragma warning disable 618
-                        lastBlockView = TryGetIndexedStreamBlockView(streamLog, in record.BufferRef, out var nativeBuffer,
+                        lastBlockView = TryGetIndexedStreamBlockView(streamLog, in record.BufferRef,
+                            out var nativeBuffer,
                             expectedFirstVersion: 0, // it could be not initialized, we check this on the next line
                             ignoreAlreadyIndexed: true); // we took record.BufferRef from SBI
 #pragma warning restore 618
 
                         if (!lastBlockView.IsInitialized)
                         {
-                            var blockBuffer = BlockMemoryPool.NativeToStreamBlockBuffer(nativeBuffer, streamLog.StreamLogFlags.Pow2Payload());
+                            var blockBuffer = BlockMemoryPool.NativeToStreamBlockBuffer(nativeBuffer,
+                                streamLog.StreamLogFlags.Pow2Payload());
 
                             // true if we are initializing the block for the first time
-                            if (StreamBlock.TryInitialize(blockBuffer, streamLog.Slid, streamLog.BlockInitialVersionAndFlags, streamLog.ItemFixedSize,
-                                nextBlockFirstVersion, lastBlockView.Checksum, lastBlockView.GetLastTimestampOrDefault()))
+                            if (StreamBlock.TryInitialize(blockBuffer, streamLog.Slid,
+                                streamLog.BlockInitialVersionAndFlags, streamLog.ItemFixedSize,
+                                nextBlockFirstVersion, lastBlockView.Checksum,
+                                lastBlockView.GetLastTimestampOrDefault()))
                             {
                                 if (record.Version != ReadyBlockVersion)
                                 {
@@ -1537,7 +1577,9 @@ namespace DataSpreads.StreamLogs
 
                                 SharedMemory.IncrementIndexedStreamBlock(nativeBuffer.Data);
                                 var manager = SharedMemory.Create(nativeBuffer, record.BufferRef, _blockPool);
-                                nextBlock = new StreamBlock(manager.GetBlockBuffer(streamLog.StreamLogFlags.Pow2Payload()), manager, streamLog.Slid,
+                                nextBlock = new StreamBlock(
+                                    manager.GetBlockBuffer(streamLog.StreamLogFlags.Pow2Payload()), manager,
+                                    streamLog.Slid,
                                     streamLog.ItemFixedSize, lastBlockView.FirstVersion);
                                 lastBlockView = default;
                                 goto ABORT;
@@ -1554,10 +1596,13 @@ namespace DataSpreads.StreamLogs
                         {
                             SharedMemory.IncrementIndexedStreamBlock(nativeBuffer.Data);
                             var manager = SharedMemory.Create(nativeBuffer, record.BufferRef, _blockPool);
-                            nextBlock = new StreamBlock(manager.GetBlockBuffer(streamLog.StreamLogFlags.Pow2Payload()), manager, streamLog.Slid, streamLog.ItemFixedSize,
+                            nextBlock = new StreamBlock(
+                                manager.GetBlockBuffer(streamLog.StreamLogFlags.Pow2Payload()), manager,
+                                streamLog.Slid, streamLog.ItemFixedSize,
                                 lastBlockFirstVersion);
 
-                            Debug.WriteLine($"[{Thread.CurrentThread.ManagedThreadId}: {Thread.CurrentThread.Name}] RentNextWritableBlockLocked: found existing non-completed block with first version: {nextBlock.FirstVersion}, {record.BufferRef}");
+                            Debug.WriteLine(
+                                $"[{Thread.CurrentThread.ManagedThreadId}: {Thread.CurrentThread.Name}] RentNextWritableBlockLocked: found existing non-completed block with first version: {nextBlock.FirstVersion}, {record.BufferRef}");
 
                             lastBlockView = default;
                             goto ABORT;
@@ -1565,7 +1610,8 @@ namespace DataSpreads.StreamLogs
 
                         #region Replace completed empty
 
-                        var requestedVersionExistsAndIsCompleted = lastBlockFirstVersion == nextBlockFirstVersion && isCompleted;
+                        var requestedVersionExistsAndIsCompleted =
+                            lastBlockFirstVersion == nextBlockFirstVersion && isCompleted;
 
                         // Completed empty means there was not enough space, we need a larger block and replace the empty one.
                         // Note that completed block has no relation to completed stream log (which requires a special record with version = ulong.Max)
@@ -1574,7 +1620,7 @@ namespace DataSpreads.StreamLogs
 #pragma warning disable 618
                             if (lastBlockView.CountVolatile > 0)
                             {
-                                var r = new StreamBlockRecord() {Version = lastBlockView.FirstVersion};
+                                var r = new StreamBlockRecord() { Version = lastBlockView.FirstVersion };
                                 var x = c.TryFindDup(Lookup.GT, ref streamId, ref r);
 
                                 //lastBlockView = default;
@@ -1604,13 +1650,15 @@ namespace DataSpreads.StreamLogs
                                     ThrowHelper.FailFast("Block to replace is not the last one, wrong code logic.");
                                 }
 
-                                lastBlockView = TryGetIndexedStreamBlockView(streamLog, in replaceBlockRecord.BufferRef,
+                                lastBlockView = TryGetIndexedStreamBlockView(streamLog,
+                                    in replaceBlockRecord.BufferRef,
                                     out nativeBuffer, replaceBlockRecord.Version,
                                     ignoreAlreadyIndexed: true); // we took record.BufferRef from SBI
 
                                 if (lastBlockView.IsInitialized)
                                 {
-                                    ThrowHelper.FailFast("Ready block after an empty completed block is initialized. This should never happen, wrong code logic.");
+                                    ThrowHelper.FailFast(
+                                        "Ready block after an empty completed block is initialized. This should never happen, wrong code logic.");
                                 }
 
                                 _blocksDb.Delete(txn, streamId, replaceBlockRecord);
@@ -1646,7 +1694,8 @@ namespace DataSpreads.StreamLogs
                     {
 #pragma warning disable 618
                         lastBlockView = TryGetIndexedStreamBlockView(streamLog, in record.BufferRef, out _,
-                            expectedFirstVersion: 0, // not record.Version, below we handle the case when record.Version == ReadyBlockVersion
+                            expectedFirstVersion:
+                            0, // not record.Version, below we handle the case when record.Version == ReadyBlockVersion
                             ignoreAlreadyIndexed: true); // we took record.BufferRef from SBI
 #pragma warning restore 618
 
@@ -1737,17 +1786,20 @@ namespace DataSpreads.StreamLogs
                     isRent: true, // increment count from 0 to 2: one for SBI and one for the caller of this method
                     ignoreAlreadyIndexed: true);
 
-                nextBlock = new StreamBlock(nextMemory.GetBlockBuffer(streamLog.StreamLogFlags.Pow2Payload()), nextMemory, streamLog.Slid,
+                nextBlock = new StreamBlock(nextMemory.GetBlockBuffer(streamLog.StreamLogFlags.Pow2Payload()),
+                    nextMemory, streamLog.Slid,
                     // More asserts with the values we have just created the block with. Not needed but if they fail then something badly wrong with the code.
                     // TODO (low) after proper testing replace with debug asserts after this call.
                     expectedValueSize: streamLog.ItemFixedSize,
                     expectedFirstVersion: nextBlockFirstVersion);
 
-                Debug.WriteLine($"[{Thread.CurrentThread.ManagedThreadId}: {Thread.CurrentThread.Name}] RentNextWritableBlockLocked: created new block with first version: {nextBlock.FirstVersion}, {nextMemory.BufferRef}");
+                Debug.WriteLine(
+                    $"[{Thread.CurrentThread.ManagedThreadId}: {Thread.CurrentThread.Name}] RentNextWritableBlockLocked: created new block with first version: {nextBlock.FirstVersion}, {nextMemory.BufferRef}");
 
                 if (!lastBlockView.IsValid)
                 {
-                    ThrowHelper.AssertFailFast(nextBlockFirstVersion == 1, "Last buffer could be invalid only when we are creating the first block");
+                    ThrowHelper.AssertFailFast(nextBlockFirstVersion == 1,
+                        "Last buffer could be invalid only when we are creating the first block");
                 }
 
                 if (replacedBufferRef0 != default)
@@ -1777,8 +1829,10 @@ namespace DataSpreads.StreamLogs
                 ABORT:
                 txn.Abort();
                 txnActive = false;
-                ThrowHelper.AssertFailFast(!lastBlockView.IsValid, "LastBuffer is invalid on abort. We go to ABORT only when we could use it.");
-                ThrowHelper.AssertFailFast(nextBlock._manager != null || !nextBlock.IsValid, "Returned valid block must have memory manager so that it could be properly disposed later.");
+                ThrowHelper.AssertFailFast(!lastBlockView.IsValid,
+                    "LastBuffer is invalid on abort. We go to ABORT only when we could use it.");
+                ThrowHelper.AssertFailFast(nextBlock._manager != null || !nextBlock.IsValid,
+                    "Returned valid block must have memory manager so that it could be properly disposed later.");
                 return nextBlock;
             }
             catch
