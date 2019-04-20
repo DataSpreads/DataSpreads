@@ -132,7 +132,7 @@ namespace DataSpreads.StreamLogs
                 var uri = new Uri(path);
                 var absoluteUri = uri.AbsoluteUri;
 
-                blockStorage = new SQLiteStorage($@"Data Source={absoluteUri}?cache=shared");
+                blockStorage = new SQLiteStorage($@"Data Source={absoluteUri}"); // ?cache=shared
             }
 
             var blockIndexPath = Path.Combine(DataStorePath, "log", "blockindex");

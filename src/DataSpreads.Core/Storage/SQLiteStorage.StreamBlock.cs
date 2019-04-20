@@ -200,15 +200,23 @@ namespace DataSpreads.Storage
             //    }
             //}
 
-            var qs = RentQueries();
-            try
+            using (var txn = Begin())
             {
-                return qs.InsertBlock(in blockView);
+                var result = txn.Queries.InsertBlock(in blockView);
+                txn.Commit();
+                return result;
             }
-            finally
-            {
-                ReturnQueries(qs);
-            }
+
+            //    var qs = RentQueries();
+            
+            //try
+            //{
+            //    return txn.Queries.InsertBlock(in blockView);
+            //}
+            //finally
+            //{
+            //    ReturnQueries(qs);
+            //}
         }
 
         //[MethodImpl(MethodImplOptions.AggressiveInlining)]

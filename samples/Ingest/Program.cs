@@ -9,7 +9,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using CrossProcess;
+using DataSpreads.Tests.Run;
 
 namespace Ingest
 {
@@ -48,7 +48,7 @@ namespace Ingest
         private static DataStore DS;
         private static Repo Repo;
 
-        private static int StreamCount = 100;
+        private static int StreamCount = 200;
 
         private const int ItemCount = 10_000_000;
         private static long TotalCount = 0;
@@ -124,7 +124,7 @@ namespace Ingest
                     previousCount = tc;
                     sw.Stop();
                     var log =
-                        $"Written items total {tc:N0}, raw payload MB {(tc * 24.0 / (1024 * 1024)):N0}, in last {sw.ElapsedMilliseconds} msecs: {c:N0}, Mops {(c * 0.001/ sw.ElapsedMilliseconds):N2} \n";
+                        $"Written items total {tc:N0}, raw payload MB {(tc * (8 + 24.0) / (1024 * 1024)):N0}, in last {sw.ElapsedMilliseconds} msecs: {c:N0}, Mops {(c * 0.001/ sw.ElapsedMilliseconds):N2} \n";
                     File.AppendAllText(Path.Combine(path, "log.txt"), log);
                     Console.Write(log);
                 }

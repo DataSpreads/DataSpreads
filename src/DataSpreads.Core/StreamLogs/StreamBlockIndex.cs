@@ -756,7 +756,7 @@ namespace DataSpreads.StreamLogs
             if (packAction != Packer.PackAction.Delete && lastPackedBlockVersionFromState > lastPackedBlockVersionFromStorage)
             {
                 // we write to storage first.
-                ThrowHelper.FailFast($"lastPackedRecordVersion {lastPackedBlockVersionFromState} > lastPackedStorageVersion {lastPackedBlockVersionFromStorage}");
+                ThrowHelper.FailFast($"lastPackedRecordVersion {lastPackedBlockVersionFromState} > lastPackedStorageVersion {lastPackedBlockVersionFromStorage} for Slid {slid}");
             }
             else if (lastPackedBlockVersionFromState < lastPackedBlockVersionFromStorage)
             {
@@ -813,6 +813,7 @@ namespace DataSpreads.StreamLogs
             #endregion Find blocks to pack & release
 
             var packedCount = 0;
+            var lastInsertedVersion = 0UL;
 
             #region Do packing
 
@@ -887,6 +888,10 @@ namespace DataSpreads.StreamLogs
                                             // TODO this is not hit now with commented condition || header.FlagsCounter.Count == 1
                                             ThrowHelper.FailFast("this is not hit now with commented condition || header.FlagsCounter.Count == 1");
                                         }
+                                    }
+                                    else
+                                    {
+                                        lastInsertedVersion = blockView.FirstVersion;
                                     }
 
                                     break;
@@ -967,7 +972,17 @@ namespace DataSpreads.StreamLogs
             var lastPackedVersion = unpackedRecords[packedCount - 1].Version;
 
             //Console.WriteLine($"Stored count: {storedCount}, last version: {lastPackedVersion}");
+            ulong fromStorage = 0;
+            if (fromStorage != 0 && (fromStorage = BlockStorage.LastStreamBlockKey(streamId)) != lastPackedVersion)
+            {
+                ThrowHelper.FailFast($"XXXXXXX: updating state with wrong key {fromStorage} vs {lastPackedVersion}, cnt {packedCount}, slid {slid}");
+            }
 
+            // Console.WriteLine($"UPDATING LAST PACKED STATE: {lastPackedVersion}, cnt {packedCount}, slid {slid}");
+            if (fromStorage != 0 && lastInsertedVersion != lastPackedVersion)
+            {
+                ThrowHelper.FailFast($"YYYYYYYYYYY: lastInsertedVersion {lastInsertedVersion} != lastPackedVersion {lastPackedVersion}, cnt {packedCount}, slid {slid}");
+            }
             state.SetLastPackedBlockVersion(lastPackedVersion);
 
             // only now we can release lingering blocks

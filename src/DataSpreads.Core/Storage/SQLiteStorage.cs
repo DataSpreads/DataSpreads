@@ -584,10 +584,10 @@ namespace DataSpreads.Storage
                 // Much slower writes in test query with this: connection.Execute("PRAGMA page_size = 16384; ");
                 connection.Execute("PRAGMA cache_size = 5000;");
                 connection.Execute("PRAGMA synchronous = NORMAL;"); // TODO (review) this is not always needed
-                connection.Execute("PRAGMA journal_mode = wal2;");
+                connection.Execute("PRAGMA journal_mode = wal;");
                 // TODO review, keep default so far connection.Execute("PRAGMA wal_autocheckpoint=10000;");
                 // TODO
-                connection.Execute("PRAGMA read_uncommitted = true;");
+                // connection.Execute("PRAGMA read_uncommitted = true;");
                 connection.Execute("PRAGMA busy_timeout = 10;");
                 // This does not add a lot and not always, risks with IO errors/SIGBUS do not worth it: connection.Execute("PRAGMA mmap_size=268435456;");
 

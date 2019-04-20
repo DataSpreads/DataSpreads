@@ -404,6 +404,7 @@ namespace DataSpreads.StreamLogs
                         if (value.Length <= 0 ||
                             KeyComparer<Timestamp>.Default.Compare(recordKey, value.DangerousGet(0)) != 0)
                         {
+                            var val = value.DangerousGet(0);
                             ThrowBadBlockFromSource();
                         }
                     }

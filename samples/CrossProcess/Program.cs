@@ -9,6 +9,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Spreads.Serialization;
+using DataSpreads.Tests.Run;
 
 namespace CrossProcess
 {
@@ -44,15 +45,15 @@ namespace CrossProcess
         // we throw when finalizing retained buffers which kills the app.
         private static int StreamCount = 1 + Environment.ProcessorCount / 3;
 
-        private const int ItemsPerStreamCount = 5_000_000;
+        private const int ItemsPerStreamCount = 20_000_000;
 
         public static async Task Main(string[] args)
         {
             // Print diagnostic info to console.
-            // Trace.Listeners.Add(new ConsoleListener());
+            Trace.Listeners.Add(new ConsoleListener());
 
             // Traces ctor stack of leaked buffers. Slow and should normally be off.
-            Settings.DoDetectBufferLeaks = false;
+            Settings.DoDetectBufferLeaks = true;
 
             // Bound checks and other correctness checks. Fast and should be ON until the lib is stable.
             Settings.DoAdditionalCorrectnessChecks = false;
@@ -87,7 +88,7 @@ namespace CrossProcess
                 {
                     if (args[0] == "a")
                     {
-                        Console.WriteLine("Starting requester");
+                        Console.WriteLine("Starting Requester");
                         await Requester().ConfigureAwait(false);
                     }
                     else if (args[0] == "b")

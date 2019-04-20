@@ -32,19 +32,6 @@ using System.Threading.Tasks;
 
 namespace DataSpreads.Tests.Run
 {
-    internal class ConsoleListener : TraceListener
-    {
-        public override void Write(string message)
-        {
-            Console.Write(message);
-        }
-
-        public override void WriteLine(string message)
-        {
-            Console.WriteLine(message);
-        }
-    }
-
     internal class Program
     {
         private static async Task Main(string[] args)

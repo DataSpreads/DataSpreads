@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 
-namespace CrossProcess
+namespace DataSpreads.Tests.Run
 {
     internal class ConsoleListener : TraceListener
     {

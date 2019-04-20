@@ -498,7 +498,7 @@ namespace DataSpreads.StreamLogs
             // we do not need volatile but need atomic write just in case of torn read
             if (IntPtr.Size == 8)
             {
-                return Unsafe.ReadUnaligned<ulong>(_statePointer + StreamLogStateRecord.LastPackedChunkVersionOffset);
+                return Volatile.Read(ref *(ulong*)(_statePointer + StreamLogStateRecord.LastPackedChunkVersionOffset));
             }
             else
             {
@@ -515,7 +515,7 @@ namespace DataSpreads.StreamLogs
 
             if (IntPtr.Size == 8)
             {
-                Unsafe.WriteUnaligned(_statePointer + StreamLogStateRecord.LastPackedChunkVersionOffset, value);
+                Volatile.Write(ref *(ulong*)(_statePointer + StreamLogStateRecord.LastPackedChunkVersionOffset), value);
             }
             else
             {

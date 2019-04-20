@@ -152,11 +152,12 @@ namespace DataSpreads.Storage
                                 : PackAction.Pack;
 
                         couldHaveMore = _streamLogManager.BlockIndex.PackBlocks(state, packAction);
-                        if (couldHaveMore)
-                        {
-                            // extend lock to avoid timeout
-                            packerLock = state.AcquirePackerLock(packerLock);
-                        }
+                        break;
+                        //if (couldHaveMore)
+                        //{
+                        //    // extend lock to avoid timeout
+                        //    packerLock = state.AcquirePackerLock(packerLock);
+                        //}
                     }
                 }
                 finally
