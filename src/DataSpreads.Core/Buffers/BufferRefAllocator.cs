@@ -173,6 +173,7 @@ namespace DataSpreads.Buffers
 
         protected BufferRef Allocate(Transaction txn, byte bucketIndex, out bool fromFreeList, SharedMemoryBuckets buckets = null)
         {
+            var originalBucketIndex = bucketIndex;
             fromFreeList = false;
             BufferRef.EnsureBucketIndexInRange(bucketIndex);
 
@@ -187,9 +188,13 @@ namespace DataSpreads.Buffers
                     && fC.TryGet(ref bucketIndex, ref freeRef, CursorGetOption.FirstDuplicate)
                 ) // prefer closer to the bucket start, DRs are sorted by index // TODO test with first with high churn & packer
                 {
+                    ThrowHelper.AssertFailFast(originalBucketIndex == bucketIndex, $"originalBucketIndex {originalBucketIndex} == bucketIndex {bucketIndex}");
+
                     _freeDb.Delete(txn, bucketIndex, freeRef);
                     var ar = freeRef;
+
                     aC.Put(ref bucketIndex, ref ar, CursorPutOptions.None);
+
                     fromFreeList = true;
                     if (buckets != null)
                     {
@@ -253,12 +258,16 @@ namespace DataSpreads.Buffers
                     if (aC.TryGet(ref bucketIndex, ref lastAllocated, CursorGetOption.Set)
                         && aC.TryGet(ref bucketIndex, ref lastAllocated, CursorGetOption.LastDuplicate))
                     {
+                        ThrowHelper.AssertFailFast(lastAllocated.BufferIndex > 0, "BufferRef.BufferIndex is one-based");
                         bufferIndex += lastAllocated.BufferIndex;
                     }
+
+                    ThrowHelper.AssertFailFast(originalBucketIndex == bucketIndex, $"originalBucketIndex {originalBucketIndex} == bucketIndex {bucketIndex}");
 
                     freeRef = BufferRef.Create(bucketIndex, bufferIndex);
 
                     lastAllocated = freeRef;
+
                     // _allocatedDb.Put(txn, bucketIndex, lastAllocated, TransactionPutOptions.AppendDuplicateData);
                     aC.Put(ref bucketIndex, ref lastAllocated, CursorPutOptions.AppendDuplicateData);
 
@@ -304,15 +313,17 @@ namespace DataSpreads.Buffers
                             var directBuffer = buckets.DangerousGet(freeRef);
 #pragma warning restore 618
                             var header = directBuffer.Read<SharedMemory.BufferHeader>(0);
+
                             if (header.FlagsCounter != default)
                             {
-                                throw new InvalidOperationException($"Allocated buffer has non-empry header.FlagsCounter: {header.FlagsCounter}");
+                                throw new InvalidOperationException($"Allocated buffer for {freeRef} has non-empty header.FlagsCounter: {header.FlagsCounter}");
                             }
 
                             if (header.AllocatorInstanceId != default)
                             {
                                 throw new InvalidOperationException($"Allocated buffer has non-empry header.AllocatorInstanceId: {header.AllocatorInstanceId}");
                             }
+
                             header.FlagsCounter = HeaderFlags.Releasing | HeaderFlags.IsDisposed;
                             header.AllocatorInstanceId = _wpid.InstanceId;
 
@@ -352,11 +363,15 @@ namespace DataSpreads.Buffers
 
         protected void Free(Transaction txn, BufferRef bufferRef) //, Wpid wpid = default)
         {
+            if (bufferRef.Flag)
+            {
+                ThrowHelper.FailFast($"bufferRef.Flag is true in BRA.Free");
+            }
             using (var aC = _allocatedDb.OpenCursor(txn))
             {
                 byte bucketIndex = checked((byte)bufferRef.BucketIndex);
                 var ar = bufferRef;
-                if (aC.TryGet(ref bucketIndex, ref ar, CursorGetOption.GetBoth))
+                if (aC.TryFindDup(Lookup.EQ, ref bucketIndex, ref ar))
                 {
                     _allocatedDb.Delete(txn, bucketIndex, ar);
                     _freeDb.Put(txn, bucketIndex, bufferRef);
@@ -367,29 +382,6 @@ namespace DataSpreads.Buffers
                 }
             }
         }
-
-        //        [MethodImpl(MethodImplOptions.NoInlining
-        //#if NETCOREAPP3_0
-        //                    | MethodImplOptions.AggressiveOptimization
-        //#endif
-        //        )]
-        //        public int GetAllocatorInstanceId(BufferRef bufferRef)
-        //        {
-        //            using (var txn = _env.BeginReadOnlyTransaction())
-        //            {
-        //                using (var aC = _allocatedDb.OpenReadOnlyCursor(txn))
-        //                {
-        //                    byte bucketIndex = checked((byte)bufferRef.BucketIndex);
-        //                    var ar = bufferRef;
-        //                    if (aC.TryGet(ref bucketIndex, ref ar, CursorGetOption.GetBoth))
-        //                    {
-        //                        return (int)ar.AllocatorInstance;
-        //                    }
-
-        //                    return -1;
-        //                }
-        //            }
-        //        }
 
         [MethodImpl(MethodImplOptions.NoInlining
 #if NETCOREAPP
@@ -632,13 +624,9 @@ namespace DataSpreads.Buffers
         private void InitDbs()
         {
             _allocatedDb = _env.OpenDatabase("_allocated",
-                new DatabaseConfig(DbFlags.Create | DbFlags.IntegerKey | DbFlags.DuplicatesSort | DbFlags.DuplicatesFixed)
-                {
-                    // compare by the first 4 bytes as integer
-                    DupSortPrefix = 32
-                });
+                new DatabaseConfig(DbFlags.Create | DbFlags.DuplicatesSort | DbFlags.IntegerDuplicates));
             _freeDb = _env.OpenDatabase("_free",
-                new DatabaseConfig(DbFlags.Create | DbFlags.IntegerKey | DbFlags.DuplicatesSort | DbFlags.IntegerDuplicates));
+                new DatabaseConfig(DbFlags.Create | DbFlags.DuplicatesSort | DbFlags.IntegerDuplicates));
         }
 
         public virtual void Dispose()

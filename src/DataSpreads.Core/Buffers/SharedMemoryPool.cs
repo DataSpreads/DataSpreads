@@ -291,7 +291,7 @@ namespace DataSpreads.Buffers
             }
             if (_bra.IsInFreeList(bufferRef))
             {
-                ThrowHelper.ThrowInvalidOperationException($"bufferRef {bufferRef} in not in free list.");
+                ThrowHelper.ThrowInvalidOperationException($"bufferRef {bufferRef} in in free list.");
             }
             _bra.Free(bufferRef);
         }
@@ -301,7 +301,7 @@ namespace DataSpreads.Buffers
             sm.FromOwnedDisposedToReleasingDisposed();
 
             Debug.Assert(sm.IsDisposed);
-            Debug.Assert(sm.Header.FlagsCounter == (HeaderFlags.Releasing | HeaderFlags.IsDisposed));
+            ThrowHelper.AssertFailFast(sm.Header.FlagsCounter == (HeaderFlags.Releasing | HeaderFlags.IsDisposed), "ReturnNative: sm.Header.FlagsCounter == (HeaderFlags.Releasing | HeaderFlags.IsDisposed)");
 
             // Now the buffer is logically free. To be able to reuse it
             // we must return it to the free list. If the next operation fails

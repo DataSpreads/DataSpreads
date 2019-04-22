@@ -94,7 +94,7 @@ namespace DataSpreads.Buffers
     internal readonly unsafe struct BufferRef : IEquatable<BufferRef>
     {
         internal const int MaxBucketIdx = 15;
-        private const int MaxBufferIdx = (1 << 27) - 1;
+        internal const int MaxBufferIdx = (1 << 27) - 1;
 
         private const int FlagOffset = 31;
         private const uint FlagMask = (uint)1 << FlagOffset;
