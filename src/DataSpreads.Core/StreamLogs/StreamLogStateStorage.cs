@@ -157,7 +157,7 @@ namespace DataSpreads.StreamLogs
                     }
                     else
                     {
-                        Debug.Assert(result.IsFilledWithValue(0), "a new ProcessConfig buffer must be clean.");
+                        Debug.Assert(result.IsFilledWithValue(0), "a new StreamLogState buffer must be clean.");
                     }
 
                     return new StreamLogState(slid, (IntPtr)_buckets[bufferRef].Data);

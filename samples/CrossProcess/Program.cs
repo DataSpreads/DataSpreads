@@ -1,6 +1,8 @@
 ﻿using DataSpreads;
+using DataSpreads.Tests.Run;
 using Spreads;
 using Spreads.DataTypes;
+using Spreads.Serialization;
 using Spreads.Utils;
 using System;
 using System.Collections.Generic;
@@ -8,8 +10,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using Spreads.Serialization;
-using DataSpreads.Tests.Run;
 
 namespace CrossProcess
 {
@@ -32,7 +32,6 @@ namespace CrossProcess
             Field1 = value;
         }
     }
-
 
     internal class Program
     {
@@ -100,7 +99,7 @@ namespace CrossProcess
                 else
                 {
                     // TODO Currently races in Packer when run from separate processes.
-#if XXX
+#if !XXX
                     var req = Requester();
                     var res = Responder();
                     await req.ConfigureAwait(false);
@@ -157,8 +156,7 @@ namespace CrossProcess
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Exception in Requester: " + ex);
-                throw;
+                Environment.FailFast("Exception in Requester", ex);
             }
         }
 
@@ -170,31 +168,45 @@ namespace CrossProcess
             {
                 var reqT = Task.Run(async () =>
                 {
-                    for (int i = 0; i < ItemsPerStreamCount; i++)
+                    try
                     {
-                        var version = await req.TryAppend(new Message(i), Timestamp.Now).ConfigureAwait(false);
-                        if (version == 0)
+                        for (int i = 0; i < ItemsPerStreamCount; i++)
                         {
-                            throw new Exception("Cannot append to req stream");
+                            var version = await req.TryAppend(new Message(i), Timestamp.Now).ConfigureAwait(false);
+                            if (version == 0)
+                            {
+                                throw new Exception("Cannot append to req stream");
+                            }
                         }
+                    }
+                    catch (Exception ex)
+                    {
+                        Environment.FailFast("Exception in reqT", ex);
                     }
                 });
 
                 var resT = Task.Run(async () =>
                 {
-                    var i = 0;
-                    await foreach (var keyValuePair in res) // Note: Async stream
+                    try
                     {
-                        i++;
-                        if (i > 0 && i % 1_000_000 == 0)
+                        var i = 0;
+                        await foreach (var keyValuePair in res) // Note: Async stream
                         {
-                            Console.WriteLine($"Processed: {i:N0}");
-                        }
+                            i++;
+                            if (i > 0 && i % 1_000_000 == 0)
+                            {
+                                Console.WriteLine($"Processed: {i:N0}");
+                            }
 
-                        if (i == ItemsPerStreamCount)
-                        {
-                            break;
+                            if (i == ItemsPerStreamCount)
+                            {
+                                break;
+                            }
                         }
+                    }
+                    catch (Exception ex)
+                    {
+                        Environment.FailFast("Exception in resT", ex);
                     }
                 });
 
@@ -230,15 +242,22 @@ namespace CrossProcess
             {
                 var t = Task.Run(async () =>
                 {
-                    var i = 0;
-                    await foreach (var keyValuePair in req) // Note: Async stream
+                    try
                     {
-                        await res.TryAppend(new Message(keyValuePair.Value.Value.Field1 * 2)).ConfigureAwait(false);
-                        i++;
-                        if (i == ItemsPerStreamCount)
+                        var i = 0;
+                        await foreach (var keyValuePair in req) // Note: Async stream
                         {
-                            break;
+                            await res.TryAppend(new Message(keyValuePair.Value.Value.Field1 * 2)).ConfigureAwait(false);
+                            i++;
+                            if (i == ItemsPerStreamCount)
+                            {
+                                break;
+                            }
                         }
+                    }
+                    catch (Exception ex)
+                    {
+                        Environment.FailFast("Exception in responder", ex);
                     }
                 });
 

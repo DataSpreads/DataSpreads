@@ -87,11 +87,6 @@ namespace DataSpreads.StreamLogs
             return ((byte)flags & (byte)StreamLogFlags.DropPacked) != 0;
         }
 
-        // we do not use Pow2 logic in the latest Append, but
-        // it has race when rotating. Could add IsCompleted
-        // check Count >= capacity?
-        // TODO Review
-        [Obsolete("Notification log? Not only Log0, any aeron style.")]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool Pow2Payload(this StreamLogFlags flags)
         {

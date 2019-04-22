@@ -346,7 +346,7 @@ namespace DataSpreads.StreamLogs
                 ThrowHelper.FailFast("Init could only be called when active chunk is invalid");
             }
 
-            var block = BlockIndex.RentNextWritableBlock(this, default, default, default);
+            var block = BlockIndex.RentInitWritableBlock(this);
             if (block.IsValid)
             {
                 ActiveBlock = block;

@@ -201,7 +201,8 @@ namespace DataSpreads.StreamLogs
                     ActiveBlock.ItemFixedSize,
                     ActiveBlock.FirstVersion);
 
-                if (_blocks.TryRemove(ActiveBlock.FirstVersion - (ulong)_blockCapacity * 2, out _))
+                if (ActiveBlock.FirstVersion  > (ulong)_blockCapacity * 2 
+                    && _blocks.TryRemove(ActiveBlock.FirstVersion - (ulong)_blockCapacity * 2, out _))
                 {
                     // Trace.TraceInformation("Removed Log0 old block from cache");
                 }

@@ -145,7 +145,6 @@ namespace DataSpreads.Storage
             return chunk;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private StreamBlock GetStreamBlock(long streamId, ulong blockKey)
         {
             var qs = RentQueries();
@@ -163,67 +162,30 @@ namespace DataSpreads.Storage
         {
             try
             {
-                return Put(in blockView) > 0;
+                var (inserted, rowId) = InsertBlock(in blockView);
+                if (!inserted || rowId == 0)
+                {
+                    ThrowHelper.ThrowInvalidOperationException(PutFailMessage);
+                }
+
+                return inserted && rowId > 0;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 ThrowHelper.FailFast("EX in TryPutStreamBlock: " + ex);
                 return false;
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public long Put(in StreamBlock blockView)
+        public (bool inserted, long rowId) InsertBlock(in StreamBlock blockView)
         {
-            var (inserted, rowId) = InsertBlock(in blockView);
-            if (inserted)
-            {
-                return rowId;
-            }
-            ThrowHelper.ThrowInvalidOperationException(PutFailMessage);
-            return default;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public (bool inserted, long storageId) InsertBlock(in StreamBlock blockView)
-        {
-            // This adds nothing to simple inserts. TODO remove
-            //using (var txn = BeginConcurrent())
-            //{
-            //    try
-            //    {
-            //        return txn.Queries.InsertBlock(in blockView);
-            //    }
-            //    finally
-            //    {
-            //        txn.RawCommit();
-            //    }
-            //}
-
             using (var txn = Begin())
             {
                 var result = txn.Queries.InsertBlock(in blockView);
                 txn.Commit();
                 return result;
             }
-
-            //    var qs = RentQueries();
-            
-            //try
-            //{
-            //    return txn.Queries.InsertBlock(in blockView);
-            //}
-            //finally
-            //{
-            //    ReturnQueries(qs);
-            //}
         }
-
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //public (bool, long) InsertChunk(StreamBlock blockView, Transaction txn)
-        //{
-        //    return txn.Queries.InsertChunk(blockView);
-        //}
 
         public partial class StorageQueries
         {
@@ -379,7 +341,7 @@ namespace DataSpreads.Storage
                     {
                         if (hasRow)
                         {
-                            ThrowHelper.FailFast("InsertChunk should not return rows");
+                            ThrowHelper.FailFast("InsertBlock should not return rows");
                         }
 
                         var changes = reader.Changes();
@@ -387,19 +349,19 @@ namespace DataSpreads.Storage
                         {
                             Trace.TraceWarning($"Cannot insert StreamBlock: changes = {changes}");
                         }
-                        
+
                         return (changes == 1, reader.LastRowId());
                     }, (object)null);
                 }
                 catch (Exception ex)
                 {
                     ThrowHelper.FailFast("Cannot insert block: " + ex);
-                    return (false, 0);
+                    return default;
                 }
                 finally
                 {
-                    payload.Dispose();
                     InsertBlockQuery.ClearAndReset();
+                    payload.Dispose();
                 }
             }
 
@@ -490,8 +452,8 @@ namespace DataSpreads.Storage
                             var len = reader.ColumnBytes(0);
                             var ptr = reader.ColumnBlob(0);
                             var db = new DirectBuffer(len, (byte*)ptr);
-                            BinarySerializer.Read(db, out StreamBlock chunk);
-                            return chunk;
+                            BinarySerializer.Read(db, out StreamBlock block);
+                            return block;
                         }
                         return default(StreamBlock);
                     }, (object)null);

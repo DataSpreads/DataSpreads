@@ -142,8 +142,9 @@ namespace DataSpreads.StreamLogs
 
             var logStateStoragePath = Path.Combine(DataStorePath, "log", "logstate");
 
+            
             StateStorage = new StreamLogStateStorage(logStateStoragePath);
-
+            
             // For Log0 tests we need state but we removed it from Log0 ctor, so always init it.
             // In real code _disableNotificationLog is always false.
             Log0State = StateStorage.GetState(StreamLogId.Log0Id);
