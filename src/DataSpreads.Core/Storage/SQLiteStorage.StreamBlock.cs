@@ -180,11 +180,14 @@ namespace DataSpreads.Storage
 
         public (bool inserted, long rowId) InsertBlock(in StreamBlock blockView)
         {
-            using (var txn = Begin())
+            var qs = RentQueries();
+            try
             {
-                var result = txn.Queries.InsertBlock(in blockView);
-                txn.Commit();
-                return result;
+                return qs.InsertBlock(in blockView);
+            }
+            finally
+            {
+                ReturnQueries(qs);
             }
         }
 

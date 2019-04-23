@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -33,6 +34,7 @@ namespace Ingest
             Field4 = field4;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Payload Create()
         {
             var rng = Rng ?? (Rng = new Random());
@@ -48,7 +50,7 @@ namespace Ingest
         private static DataStore DS;
         private static Repo Repo;
 
-        private static int StreamCount = 200;
+        private static int StreamCount = 50;
 
         private const int ItemCount = 10_000_000;
         private static long TotalCount = 0;
@@ -57,10 +59,10 @@ namespace Ingest
         {
             Trace.Listeners.Add(new ConsoleListener());
             Settings.ZstdCompressionLevel = 1;
-            Settings.DoDetectBufferLeaks = true;
+            Settings.DoDetectBufferLeaks = false;
 
             // Bound checks and other correctness checks. Fast and should be ON until the lib is stable.
-            Settings.DoAdditionalCorrectnessChecks = true;
+            Settings.DoAdditionalCorrectnessChecks = false;
 
             var path = Path.GetFullPath("G:/sample_data_stores/ingest");
 
@@ -103,7 +105,7 @@ namespace Ingest
                 {
                     for (int j = 0; j < ItemCount; j++)
                     {
-                        await sw.TryAppend(Payload.Create(), new Timestamp(Timestamp.Now.Millis));
+                        await sw.TryAppend(Payload.Create(), new Timestamp((long)(Timestamp.NowSeconds * 1000000000)));
                         Interlocked.Increment(ref TotalCount);
                     }
                 }));

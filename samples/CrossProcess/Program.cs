@@ -52,10 +52,10 @@ namespace CrossProcess
             Trace.Listeners.Add(new ConsoleListener());
 
             // Traces ctor stack of leaked buffers. Slow and should normally be off.
-            Settings.DoDetectBufferLeaks = true;
+            Settings.DoDetectBufferLeaks = false;
 
             // Bound checks and other correctness checks. Fast and should be ON until the lib is stable.
-            Settings.DoAdditionalCorrectnessChecks = true;
+            Settings.DoAdditionalCorrectnessChecks = false;
 
             var path = Path.GetFullPath("G:/sample_data_stores/cross_process");
 
@@ -99,7 +99,7 @@ namespace CrossProcess
                 else
                 {
                     // TODO Currently races in Packer when run from separate processes.
-#if !XXX
+#if XXX
                     var req = Requester();
                     var res = Responder();
                     await req.ConfigureAwait(false);
@@ -114,7 +114,7 @@ namespace CrossProcess
                         CreateNoWindow = false,
                         WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory,
                     });
-                    processA.ProcessorAffinity = (IntPtr)0b0000_1111;
+                    // processA.ProcessorAffinity = (IntPtr)0b0000_1111;
                     processA.OutputDataReceived += (s, e) => Console.WriteLine("A| " + e.Data);
                     processA.BeginOutputReadLine();
 
@@ -127,7 +127,7 @@ namespace CrossProcess
                         CreateNoWindow = false,
                         WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory,
                     });
-                    processB.ProcessorAffinity = (IntPtr)0b1111_0000;
+                    // processB.ProcessorAffinity = (IntPtr)0b1111_0000;
                     processB.OutputDataReceived += (s, e) => Console.WriteLine("B| " + e.Data);
                     processB.BeginOutputReadLine();
 
@@ -193,7 +193,7 @@ namespace CrossProcess
                         await foreach (var keyValuePair in res) // Note: Async stream
                         {
                             i++;
-                            if (i > 0 && (i * 10) % ItemsPerStreamCount == 0)
+                            if (i > 0 && (i * 5) % ItemsPerStreamCount == 0)
                             {
                                 Console.WriteLine($"Processed {id}: {i:N0}");
                             }

@@ -1166,7 +1166,7 @@ namespace DataSpreads.StreamLogs
         [Obsolete("Use only from SL.Rotate or tests.")] // TODO Shift+F12 to ensure, + there must be tests for non-happy paths!
         internal void PrepareNextWritableStreamBlock(StreamLog streamLog, int length)
         {
-            return;
+            //return;
             Debug.WriteLine($"[{Thread.CurrentThread.ManagedThreadId}: {Thread.CurrentThread.Name}] Entered PrepareNextWritableStreamBlock");
 
             var streamId = (long)streamLog.Slid;

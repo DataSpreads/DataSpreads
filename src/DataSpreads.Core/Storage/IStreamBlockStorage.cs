@@ -32,8 +32,6 @@ namespace DataSpreads.Storage
 {
     internal interface IStreamBlockStorage : IDisposable
     {
-        // Note: StreamBlocks are immutable so we do not need cache invalidation: if present a block is valid.
-
         /// <summary>
         /// Get StreamBlock.
         /// </summary>

@@ -565,29 +565,16 @@ namespace DataSpreads.Storage
 
             public override void InitConnection(SqliteConnection connection)
             {
-                // TODO https://www.sqlite.org/fasterthanfs.html
-                // [x] [Added to Makefile] -DSQLITE_DIRECT_OVERFLOW_READ, but we may actually benefit from cache? Likely not, because normally we read fw-only in single pass. Better keep indices in cache.
-                // [x] [Using O2] -O3/O2 (check that not Os)
-                // https://www.sqlite.org/compile.html#rcmd
-                // [x] [Added to Makefile] * Apply 2,4,5,6,7,8,10, they are not needed for DS
-                // [x] [Usring cache=shared via uri cs] * Test 9 under heavy load. We likely need shared cache SQLITE_OPEN_SHAREDCACHE and seems like do not use it now.
-                // * HAVE_FDATASYNC for servers unless we decide to use lmdb
-                // * synchronous = FULL should not be used when DS WAL is used,
-                //   but it must be 10x or so larger than SQLite wal so that on crash
-                //   DS wal has everything (or call checkpoint before deleting old DS
-                //   WAL files just to be safe).
-                // [x] * SQLITE_ENABLE_JSON1
-
                 Interlocked.Increment(ref ConnectionCount);
                 Trace.TraceInformation("Initializing SQLiteBlockStorage connection, total inits: " + ConnectionCount);
 
                 // Much slower writes in test query with this: connection.Execute("PRAGMA page_size = 16384; ");
                 connection.Execute("PRAGMA cache_size = 5000;");
-                connection.Execute("PRAGMA synchronous = NORMAL;"); // TODO (review) this is not always needed
-                connection.Execute("PRAGMA journal_mode = wal;");
+                connection.Execute("PRAGMA synchronous = NORMAL;");
+                connection.Execute("PRAGMA journal_mode = wal2;");
                 // TODO review, keep default so far connection.Execute("PRAGMA wal_autocheckpoint=10000;");
-                // TODO
-                // connection.Execute("PRAGMA read_uncommitted = true;");
+                
+                connection.Execute("PRAGMA read_uncommitted = true;"); // huge improvement in performance, we could afford it with append-only writes
                 connection.Execute("PRAGMA busy_timeout = 10;");
                 // This does not add a lot and not always, risks with IO errors/SIGBUS do not worth it: connection.Execute("PRAGMA mmap_size=268435456;");
 

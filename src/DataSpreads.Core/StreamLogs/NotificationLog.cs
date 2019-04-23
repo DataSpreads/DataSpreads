@@ -114,7 +114,7 @@ namespace DataSpreads.StreamLogs
             byte* position;
             // ReSharper disable once ImpureMethodCallOnReadonlyValueField
             var version = State.IncrementLog0Version();
-
+            var c = 0;
             while ((position = Log0ItemPosition(ActiveBlock.Pointer, (long)version, out _)) == null)
             {
                 var blockKey = BlockFirstVersion(version);
@@ -127,6 +127,11 @@ namespace DataSpreads.StreamLogs
                 }
 
                 Rotate();
+                c++;
+                if (c > 50)
+                {
+                    ThrowHelper.FailFast($"Cannot rotate notification log: c = {c}");
+                }
             }
 
             if (IntPtr.Size == 8)
