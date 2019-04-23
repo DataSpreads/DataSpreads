@@ -107,7 +107,10 @@ namespace DataSpreads.StreamLogs
             bool disablePacker = false,
             IStreamBlockStorage blockStorage = null)
         {
-            Spreads.Buffers.BufferPool.PinnedArrayMemoryPool.AddStackTraceOnRent = true;
+            if (LeaksDetection.Enabled)
+            {
+                Spreads.Buffers.BufferPool.PinnedArrayMemoryPool.AddStackTraceOnRent = true;
+            }
 
             DataStorePath = dataStorePath ?? Path.Combine(processConfig.DataRootPath, dataStoreName);
 
@@ -142,9 +145,8 @@ namespace DataSpreads.StreamLogs
 
             var logStateStoragePath = Path.Combine(DataStorePath, "log", "logstate");
 
-            
             StateStorage = new StreamLogStateStorage(logStateStoragePath);
-            
+
             // For Log0 tests we need state but we removed it from Log0 ctor, so always init it.
             // In real code _disableNotificationLog is always false.
             Log0State = StateStorage.GetState(StreamLogId.Log0Id);
@@ -335,7 +337,7 @@ namespace DataSpreads.StreamLogs
                 }
                 current = current1;
             }
-            else if (OpenStreams.TryGetValue((long)slid, out current))
+            else if (OpenStreams.TryGetValue((long)slid, out current) && current != null)
             {
                 _previousSlid = slid;
                 PreviousStreamStorageIndex = current.StorageIndex;
@@ -347,6 +349,7 @@ namespace DataSpreads.StreamLogs
 #if NETCOREAPP
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
 #endif
+
         protected virtual void Log0Loop()
         {
             while (Log0Reader.MoveNext())

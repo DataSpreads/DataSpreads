@@ -95,54 +95,55 @@ namespace DataSpreads.Storage
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public StreamBlock TryGetStreamBlock(long streamId, ulong blockKey)
         {
-            // TODO this should be on cursor side
-            if (_prefetchDictionary.TryRemove(streamId, out var value))
-            {
-                if (value.Result.IsValid)
-                {
-                    if (value.Result.FirstVersion == blockKey)
-                    {
-                        // Console.WriteLine("hit");
-                        Prefetch();
-                        return value.Result;
-                    }
-                }
-
-                value.Dispose();
-                var chunk1 = GetStreamBlock(streamId, blockKey);
-                return chunk1;
-            }
-
-            //if (!chunk.IsValid || chunk.StreamId != streamId || chunk.FirstVersion != blockKey)
+            //// TODO this should be on cursor side
+            //if (_prefetchDictionary.TryRemove(streamId, out var value))
             //{
-            //    ThrowHelper.FailFast(GetFailedWrongStreamIdOrVersionMessage);
+            //    if (value.Result.IsValid)
+            //    {
+            //        if (value.Result.FirstVersion == blockKey)
+            //        {
+            //            // Console.WriteLine("hit");
+            //            Prefetch();
+            //            return value.Result;
+            //        }
+            //    }
+
+            //    value.Dispose();
+            //    var chunk1 = GetStreamBlock(streamId, blockKey);
+            //    return chunk1;
             //}
 
-            void Prefetch()
-            {
-                _prefetchDictionary[streamId] = Task.Run(() =>
-                {
-                    var nextBlock = GetStreamBlock(streamId, blockKey + 1);
-                    if (!nextBlock.IsValid)
-                    {
-                        Debug.WriteLine("invalid block: " + (blockKey + 1));
-                    }
-                    return nextBlock;
-                    //_prefetchDictionary.AddOrUpdate(streamId, nextBlock, (sid, e) =>
-                    //{
-                    //    //if (e.ReferenceCount > 0)
-                    //    //{
-                    //    //    e.Dispose();
-                    //    //}
+            ////if (!chunk.IsValid || chunk.StreamId != streamId || chunk.FirstVersion != blockKey)
+            ////{
+            ////    ThrowHelper.FailFast(GetFailedWrongStreamIdOrVersionMessage);
+            ////}
 
-                    //    return nextBlock;
-                    //});
-                });
-            }
 
-            var chunk = GetStreamBlock(streamId, blockKey);
-            Prefetch();
-            return chunk;
+            //void Prefetch()
+            //{
+            //    _prefetchDictionary[streamId] = Task.Run(() =>
+            //    {
+            //        var nextBlock = GetStreamBlock(streamId, blockKey + 1);
+            //        if (!nextBlock.IsValid)
+            //        {
+            //            Debug.WriteLine("invalid block: " + (blockKey + 1));
+            //        }
+            //        return nextBlock;
+            //        //_prefetchDictionary.AddOrUpdate(streamId, nextBlock, (sid, e) =>
+            //        //{
+            //        //    //if (e.ReferenceCount > 0)
+            //        //    //{
+            //        //    //    e.Dispose();
+            //        //    //}
+
+            //        //    return nextBlock;
+            //        //});
+            //    });
+            //}
+
+            var block = GetStreamBlock(streamId, blockKey);
+            //Prefetch();
+            return block;
         }
 
         private StreamBlock GetStreamBlock(long streamId, ulong blockKey)

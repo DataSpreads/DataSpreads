@@ -1411,7 +1411,7 @@ namespace DataSpreads.StreamLogs
                 }
             }
 
-            // lock (_env) // be nice to LMDB, use it's lock only for x-process access
+            lock (_env) // be nice to LMDB, use it's lock only for x-process access
             {
                 return RentNextWritableBlockLocked(streamLog, minimumLength, versionToWrite, nextBlockFirstTimestamp);
             }
@@ -1589,7 +1589,7 @@ namespace DataSpreads.StreamLogs
                     | MethodImplOptions.AggressiveOptimization
 #endif
         )]
-        private unsafe void RemoveCompletedEmptyBlock(Transaction txn,
+        private void RemoveCompletedEmptyBlock(Transaction txn,
             StreamLog streamLog, ulong versionToWrite)
         {
             // There could be a buffer to clean if we replaced existing one. This should be after commit/abort probably in finally
@@ -1782,18 +1782,16 @@ namespace DataSpreads.StreamLogs
 
 #pragma warning disable 618
                 var nextMemory = GetEmptyStreamBlockMemory(minimumLength, streamLog);
-                Debug.Assert(nextMemory.Header.FlagsCounter == HeaderFlags.IsStreamBlock);
+                ThrowHelper.AssertFailFast(nextMemory.Header.FlagsCounter == HeaderFlags.IsStreamBlock, "nextMemory.Header.FlagsCounter == HeaderFlags.IsStreamBlock");
 #pragma warning restore 618
 
 #if DEBUG
-                        // Block memory is initialized with slid.
-                        var block = new StreamBlock(nextMemory.GetBlockBuffer(streamLog.StreamLogFlags.Pow2Payload()));
-                        Debug.Assert(block.StreamLogIdLong == (long)streamLog.Slid);
-                        Debug.Assert(block.FirstVersion == 0);
+                // Block memory is initialized with slid.
+                var block = new StreamBlock(nextMemory.GetBlockBuffer(streamLog.StreamLogFlags.Pow2Payload()));
+                Debug.Assert(block.StreamLogIdLong == (long)streamLog.Slid);
+                Debug.Assert(block.FirstVersion == 0);
 #endif
-                // Initialize block memory with version before commit.
-                Debug.Assert(versionToWrite > 0);
-
+                
                 if (!StreamBlock.TryInitialize(nextMemory.GetBlockBuffer(streamLog.StreamLogFlags.Pow2Payload()),
                     streamLog.Slid, streamLog.BlockInitialVersionAndFlags, streamLog.ItemFixedSize,
                     versionToWrite,
@@ -1825,8 +1823,6 @@ namespace DataSpreads.StreamLogs
                 // Trace.TraceWarning("PREPARATION FAILED");
 
                 #region After commit state updates & asserts
-
-                // TODO chaos monkey here: ChaosMonkey.Exception();
 
                 // Transition state to indexed.
                 SharedMemory.FromStreamBlockToIndexedStreamBlockClearInstanceId(nextMemory.NativeBuffer, streamLog,

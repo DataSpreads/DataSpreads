@@ -90,7 +90,7 @@ namespace DataSpreads.Config
         // 16 GB should be plenty for high load instances - we try to offload and reused shared memory
         // and the table should not grow that large. On low-load systems it will never grow large
         // and mmaped file will be small since it growths on demand.
-        private static int _streamBlockTableMaxSizeMb = 16 * 1024;
+        private static int _streamBlockTableMaxSizeMb = 64 * 1024;
 
         public const int MinimumLogSizeMb = 256;
 

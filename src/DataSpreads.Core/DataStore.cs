@@ -69,7 +69,7 @@ namespace DataSpreads
 
         public static DataStore Create(string name, string path)
         {
-            return new DataStore(ProcessConfig.Default, (uint)Interlocked.Increment(ref _counter), name, path);
+            return new DataStore(ProcessConfig.Default, (uint)Interlocked.Increment(ref _counter), name, path, maxLogSizeMb: 50 * 1024);
         }
 
         public readonly uint Id;

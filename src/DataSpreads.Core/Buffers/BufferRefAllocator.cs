@@ -596,9 +596,9 @@ namespace DataSpreads.Buffers
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowBufferRefAllocatorFullException()
+        private void ThrowBufferRefAllocatorFullException()
         {
-            throw new NotEnoughSpaceException();
+            throw new NotEnoughSpaceException(false, _maxTotalSize);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]

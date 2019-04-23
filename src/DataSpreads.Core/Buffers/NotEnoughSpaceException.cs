@@ -34,14 +34,17 @@ namespace DataSpreads.Buffers
     /// </summary>
     public class NotEnoughSpaceException : Exception
     {
-        public NotEnoughSpaceException(bool physical = false)
+        public NotEnoughSpaceException(bool physical = false, long maxSize = 0) : base($"Exceeded MaxSize: {maxSize}, physical: {physical}")
         {
             Physical = physical;
+            MaxSize = maxSize;
         }
 
         /// <summary>
         /// True if available disk size is not enough. False if logical limit in <see cref="BufferRefAllocator"/> is hit.
         /// </summary>
         public bool Physical { get; set; }
+
+        public long MaxSize { get; set; }
     }
 }

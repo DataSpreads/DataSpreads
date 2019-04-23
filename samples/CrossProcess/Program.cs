@@ -42,9 +42,9 @@ namespace CrossProcess
         // This is the main goal to make such load stable - then the whole lib is stable.
         // One nasty thing is that RetainableMemory buffers still leak and are finalized randomly,
         // we throw when finalizing retained buffers which kills the app.
-        private static int StreamCount = 1 + Environment.ProcessorCount / 3;
+        private static int StreamCount = Environment.ProcessorCount * 4;
 
-        private const int ItemsPerStreamCount = 20_000_000;
+        private const int ItemsPerStreamCount = 1_000_000;
 
         public static async Task Main(string[] args)
         {
@@ -55,9 +55,9 @@ namespace CrossProcess
             Settings.DoDetectBufferLeaks = true;
 
             // Bound checks and other correctness checks. Fast and should be ON until the lib is stable.
-            Settings.DoAdditionalCorrectnessChecks = false;
+            Settings.DoAdditionalCorrectnessChecks = true;
 
-            var path = Path.GetFullPath("./data_stores");
+            var path = Path.GetFullPath("G:/sample_data_stores/cross_process");
 
             if (args.Length == 0)
             {
@@ -193,9 +193,9 @@ namespace CrossProcess
                         await foreach (var keyValuePair in res) // Note: Async stream
                         {
                             i++;
-                            if (i > 0 && i % 1_000_000 == 0)
+                            if (i > 0 && (i * 10) % ItemsPerStreamCount == 0)
                             {
-                                Console.WriteLine($"Processed: {i:N0}");
+                                Console.WriteLine($"Processed {id}: {i:N0}");
                             }
 
                             if (i == ItemsPerStreamCount)
