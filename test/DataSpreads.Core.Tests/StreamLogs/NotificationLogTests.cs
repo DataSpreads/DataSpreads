@@ -34,6 +34,7 @@ using Spreads.Threading;
 using Spreads.Utils;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using DataSpreads.Config;
@@ -221,8 +222,6 @@ namespace DataSpreads.Tests.StreamLogs
                 Console.WriteLine("READ COUNT M: " + readCount * 1.0 / (1024 * 1024));
             }
 
-            Console.WriteLine("OLD LOOKUP COUNT: " + log0.OldPositionLookupCount);
-
             // readerTask.Wait();
 
             slm.BufferPool.PrintBuffersAfterPoolDispose = true;
@@ -252,8 +251,6 @@ namespace DataSpreads.Tests.StreamLogs
 
             var count = 3_000_000;
 
-            log0.Rotate();
-
             using (Benchmark.Run("Log0.Append", count))
             {
                 for (long i = 1; i <= count; i++)
@@ -282,6 +279,7 @@ namespace DataSpreads.Tests.StreamLogs
         {
 #pragma warning disable 618
             Settings.DoAdditionalCorrectnessChecks = false;
+            Settings.DoDetectBufferLeaks = false;
 #pragma warning restore 618
             var path = TestUtils.GetPath(clear: delete);
             var repoName = "CouldWriteAndReadLog0";
@@ -302,7 +300,7 @@ namespace DataSpreads.Tests.StreamLogs
             {
                 try
                 {
-                    var step = 10_000_000;
+                    var step = count / 10;
                     var stat = Benchmark.Run("Read", step);
                     {
                         using (var reader = new NotificationLog.Reader(slm.Log0, CancellationToken.None, false))
@@ -433,6 +431,7 @@ namespace DataSpreads.Tests.StreamLogs
          , Explicit("long running")
 #endif
         ]
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public void CouldReadWriteZeroLog()
         {
             Console.WriteLine("Starting test");
@@ -461,7 +460,7 @@ namespace DataSpreads.Tests.StreamLogs
 
             var count = TestUtils.GetBenchCount(200 * 1024 * 1024L, 1000);
             // must be pow2 because we divide count by it
-            var taskPerProcessCount = 1;
+            var taskPerProcessCount = 6;
 
             //var tasks1 = new List<Task>();
             //var tasks2 = new List<Task>();
@@ -555,12 +554,12 @@ namespace DataSpreads.Tests.StreamLogs
 
             foreach (var thread in threads1)
             {
-                thread.Priority = ThreadPriority.AboveNormal;
+                thread.Priority = ThreadPriority.Normal;
                 thread.Start();
             }
             foreach (var thread in threads2)
             {
-                thread.Priority = ThreadPriority.AboveNormal;
+                thread.Priority = ThreadPriority.Normal;
                 thread.Start();
             }
 
@@ -635,7 +634,7 @@ namespace DataSpreads.Tests.StreamLogs
                 }
             });
 
-            reader.Priority = ThreadPriority.Highest;
+            reader.Priority = ThreadPriority.Normal;
             reader.Start();
 
             foreach (var thread in threads1)
@@ -760,9 +759,8 @@ namespace DataSpreads.Tests.StreamLogs
 
             Thread.Sleep(100);
 
-            Console.WriteLine("PREVIOUS: " + (slm.Log0.OldPositionLookupCount + slm2.Log0.OldPositionLookupCount));
-            Console.WriteLine("TABLE: " + (slm.Log0.ChunkTableLookupCount + slm2.Log0.ChunkTableLookupCount));
             Console.WriteLine("ROTATE CNT: " + (slm.Log0.RotateCount + slm2.Log0.RotateCount));
+            Console.WriteLine("STALE VERSION CNT: " + (slm.Log0.StaleVersionCount + slm2.Log0.StaleVersionCount));
 
             slm.Dispose();
             slm2.Dispose();
@@ -896,9 +894,8 @@ namespace DataSpreads.Tests.StreamLogs
 
             Thread.Sleep(100);
 
-            Console.WriteLine("PREVIOUS: " + (slm.Log0.OldPositionLookupCount + slm.Log0.OldPositionLookupCount));
-            Console.WriteLine("TABLE: " + (slm.Log0.ChunkTableLookupCount + slm.Log0.ChunkTableLookupCount));
-            Console.WriteLine("ROTATE CNT: " + (slm.Log0.RotateCount + slm.Log0.RotateCount));
+            Console.WriteLine("ROTATE CNT: " + (slm.Log0.RotateCount ));
+            Console.WriteLine("STALE VERSION CNT: " + (slm.Log0.StaleVersionCount ));
 
             //slm.Dispose();
             //slm2.Dispose();

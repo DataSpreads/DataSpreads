@@ -589,7 +589,17 @@ namespace DataSpreads.StreamLogs
 
         [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ulong GetLog0Version()
+        internal ulong GetLog0VersionVolatile()
+        {
+            if (AdditionalCorrectnessChecks.Enabled)
+            { AssertValidPointer(); }
+
+            return Volatile.Read(ref *(ulong*)(_statePointer + StreamLogStateRecord.WalPositionOffset));
+        }
+
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal ulong GetLog0VersionInterlocked()
         {
             if (AdditionalCorrectnessChecks.Enabled)
             { AssertValidPointer(); }

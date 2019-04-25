@@ -46,12 +46,11 @@ namespace DataSpreads.StreamLogs
 
         private const long InvalidIdxMask = ~((StreamLogManager.MaxBufferSize / 8) - 1L);
 
-        internal long OldPositionLookupCount;
-        internal long ChunkTableLookupCount;
         internal long RotateCount;
+        internal long StaleVersionCount;
 
         /// <summary>
-        /// This could store previous block or prepared next.
+        /// This stores previous block or prepared next (TBD).
         /// </summary>
         private readonly ConcurrentDictionary<ulong, StreamBlock> _blocks = new ConcurrentDictionary<ulong, StreamBlock>();
 
@@ -82,7 +81,7 @@ namespace DataSpreads.StreamLogs
             {
                 if (firstVersion == 0)
                 {
-                    FailChunkVersionIsZero();
+                    FailBlockVersionIsZero();
                 }
             }
 
@@ -102,7 +101,11 @@ namespace DataSpreads.StreamLogs
             return (version & BlockVersionMask) + 1;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining // it has contented interlocked, which is heavy vs method call
+#if NETCOREAPP3_0
+            | MethodImplOptions.AggressiveOptimization
+#endif
+        )]
         public ulong Append(StreamLogNotification payload)
         {
             var ulongPayload = (ulong)payload;
@@ -110,27 +113,18 @@ namespace DataSpreads.StreamLogs
             {
                 FailAppendEmptyPayload();
             }
-
+            AGAIN:
             byte* position;
             // ReSharper disable once ImpureMethodCallOnReadonlyValueField
             var version = State.IncrementLog0Version();
-            var c = 0;
-            while ((position = Log0ItemPosition(ActiveBlock.Pointer, (long)version, out _)) == null)
-            {
-                var blockKey = BlockFirstVersion(version);
-                if (_blocks.TryGetValue(blockKey, out var block))
-                {
-                    if ((position = Log0ItemPosition(block.Pointer, (long)version, out _)) != null)
-                    {
-                        break;
-                    }
-                }
 
-                Rotate();
-                c++;
-                if (c > 50)
+            var blockPointer = ActiveBlock.Pointer;
+            while ((position = Log0ItemPosition(blockPointer, (long)version, out _)) == null)
+            {
+                blockPointer = UpdateBlockPointer(version);
+                if (blockPointer == null)
                 {
-                    ThrowHelper.FailFast($"Cannot rotate notification log: c = {c}");
+                    goto AGAIN;
                 }
             }
 
@@ -152,7 +146,83 @@ namespace DataSpreads.StreamLogs
                 Interlocked.Exchange(ref *(long*)(position), unchecked((long)ulongPayload));
             }
 
+            // This writer thread could have been preempted anywhere before payload write.
+            // This thread could have been low priority or from low-priority process.
+            // Other writers could have added millions of new values.
+            // We need to make sure that we are not writing to a block that readers
+            // already ignore. Such case is easily reproduced in stress tests,
+            // so we should leave no chance for that happening in actual apps.
+            // Small additional cost is justified, performance is still OK.
+            // (Log0 is used only for real time notifications or per-block notifications;
+            // Also see #3 on possibility to use multiple notification channels)
+
+            if (IsVersionStale(version))
+            {
+                goto AGAIN;
+            }
+
             return version;
+        }
+
+        /// <summary>
+        /// The version is older than the previous block.
+        /// </summary>
+        /// <param name="version"></param>
+        /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool IsVersionStale(ulong version)
+        {
+            // ReSharper disable once ImpureMethodCallOnReadonlyValueField
+            var globalVersion = State.GetLog0VersionVolatile();
+            if (globalVersion - version > (ulong)_blockCapacity // this check is much faster & still rare
+                && // the second condition is only possible when the first is true and not evaluated otherwise
+                BlockFirstVersion(globalVersion) - BlockFirstVersion(version) > (ulong)_blockCapacity)
+            {
+                Interlocked.Increment(ref StaleVersionCount);
+                return true;
+            }
+            return false;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining
+#if NETCOREAPP3_0
+            | MethodImplOptions.AggressiveOptimization
+#endif
+        )]
+        private byte* UpdateBlockPointer(ulong version)
+        {
+            byte* blockPointer = null;
+
+            var blockKey = BlockFirstVersion(version);
+
+            if (!TryUpdate())
+            {
+                if (!IsVersionStale(version))
+                {
+                    Rotate();
+                    // if we cannot get block after rotate then we are in the old block
+                    var _ = TryUpdate();
+                    // TODO Assert that version is 2 blocks old if TryUpdate after Rotate returned false
+                }
+                else
+                {
+                    ThrowHelper.FailFast("Detected stale version");
+                    // TODO increment monitoring counter
+                }
+            }
+
+            return blockPointer;
+
+            bool TryUpdate()
+            {
+                if (_blocks.TryGetValue(blockKey, out var block))
+                {
+                    blockPointer = block.Pointer;
+                    return true;
+                }
+
+                return false;
+            }
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -162,14 +232,23 @@ namespace DataSpreads.StreamLogs
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void FailChunkVersionIsZero()
+        private static void FailBlockVersionIsZero()
         {
-            ThrowHelper.FailFast("Chunk version is zero");
+            ThrowHelper.FailFast("Block version is zero");
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining
+#if NETCOREAPP3_0
+                    | MethodImplOptions.AggressiveOptimization
+#endif
+        )]
         internal void Rotate()
         {
+            // For Log0 Rotate is always for global version and we update
+            // ActiveBlock to the latest one, while keeping the previous one.
+            // If after rotation we cannot find a block in the cache then
+            // the version is stale, so we retry to write to the latest version.
+
             var existing = State.TryAcquireExclusiveLock(Wpid, ProcessConfig, out _, 0);
 
             if (AdditionalCorrectnessChecks.Enabled)
@@ -180,8 +259,10 @@ namespace DataSpreads.StreamLogs
 
             // we took the lock but do not know what other threads could have done
 
-            var globalVersion = State.GetLog0Version();
+            // ReSharper disable once ImpureMethodCallOnReadonlyValueField
+            var globalVersion = State.GetLog0VersionInterlocked();
             var globalBlockVersion = BlockFirstVersion(globalVersion);
+
             if (globalBlockVersion > ActiveBlock.FirstVersion)
             {
                 *(int*)(ActiveBlock.Pointer + StreamBlock.StreamBlockHeader.CountOffset) = _blockCapacity;
@@ -192,7 +273,7 @@ namespace DataSpreads.StreamLogs
             {
                 Interlocked.Increment(ref RotateCount);
 
-                var version = ActiveBlock.NextVersion;
+                var version = BlockFirstVersion(globalVersion + 1); // ActiveBlock.NextVersion; //
 
                 Debug.Assert(NoTimestamp, "NotificationLog does not have timestamps.");
                 Timestamp timestamp = default;
@@ -206,10 +287,18 @@ namespace DataSpreads.StreamLogs
                     ActiveBlock.ItemFixedSize,
                     ActiveBlock.FirstVersion);
 
-                if (ActiveBlock.FirstVersion  > (ulong)_blockCapacity * 2 
-                    && _blocks.TryRemove(ActiveBlock.FirstVersion - (ulong)_blockCapacity * 2, out _))
+                // delete all keys below than this
+                var keyToDelete = (long)ActiveBlock.FirstVersion - (long)_blockCapacity * 2;
+                if (keyToDelete > 0)
                 {
-                    // Trace.TraceInformation("Removed Log0 old block from cache");
+                    while (keyToDelete > 0 && _blocks.Count > 2)
+                    {
+                        if (_blocks.TryRemove((ulong)keyToDelete, out _))
+                        {
+                            Debug.WriteLine($"Removed Log0 old block from cache with key {keyToDelete}");
+                        }
+                        keyToDelete -= _blockCapacity;
+                    }
                 }
 
                 if (!ActiveBlock.IsValid)
@@ -254,7 +343,7 @@ namespace DataSpreads.StreamLogs
         // would be:
         // 0. check current value
         // 1. if current is zero check next value before spinning (or check count)
-        // 2. if next value if there check current, if not then spin. Only one value needs to be checked because Interlocked has barriers.
+        // 2. if next value is there check current, if not then spin. Only one value needs to be checked because Interlocked has barriers.
         // 3. if next is present but the current is not then add current idx to stalled queue
         //    the queue should be limited in size, we even have unused space in a block
         // 4. if current position - queue first position > some limit try read queued positions
@@ -404,7 +493,6 @@ namespace DataSpreads.StreamLogs
 
                     if (_doNotWaitForNew)
                     {
-                        // this causes full fence
                         var maxKey = (ulong)_log0.CurrentVersion;
 
                         if (_currentKey + 1 > maxKey)

@@ -38,7 +38,7 @@ namespace DataSpreads.Tests.Run
         {
             Console.WriteLine("Max memory: " + Process.GetCurrentProcess().MaxWorkingSet);
 
-            Trace.Listeners.Add(new ConsoleListener());
+            // Trace.Listeners.Add(new ConsoleListener());
 
             //DataSpreads.StateManagement.StartupConfig.StreamLogBufferPoolFlags = LMDBEnvironmentFlags.NoSync; //  | LMDBEnvironmentFlags.NoMetaSync;
             //DataSpreads.StateManagement.StartupConfig.StreamLogChunksIndexFlags = LMDBEnvironmentFlags.NoSync; //  | LMDBEnvironmentFlags.NoMetaSync; // ; // LMDBEnvironmentFlags.NoSync |
@@ -52,8 +52,8 @@ namespace DataSpreads.Tests.Run
             //    memPressure.Add(buffer);
             //}
 
-            var test = new StreamLogTests();
-            test.ClaimPerformance();
+            var test = new NotificationLogTests();
+            test.CouldReadWriteZeroLog();
 
             //test.CouldInitStreamLog();
             //test.CouldCommitToStreamLog();

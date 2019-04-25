@@ -42,9 +42,9 @@ namespace CrossProcess
         // This is the main goal to make such load stable - then the whole lib is stable.
         // One nasty thing is that RetainableMemory buffers still leak and are finalized randomly,
         // we throw when finalizing retained buffers which kills the app.
-        private static int StreamCount = Environment.ProcessorCount * 4;
+        private static int StreamCount = 12; // Environment.ProcessorCount * 4;
 
-        private const int ItemsPerStreamCount = 1_000_000;
+        private const int ItemsPerStreamCount = 100_000_000;
 
         public static async Task Main(string[] args)
         {
