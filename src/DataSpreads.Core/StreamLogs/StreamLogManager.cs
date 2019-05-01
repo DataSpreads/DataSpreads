@@ -81,6 +81,7 @@ namespace DataSpreads.StreamLogs
         internal ProcessConfig ProcessConfig { [DebuggerStepThrough][MethodImpl(MethodImplOptions.AggressiveInlining)] get; }
         internal BlockMemoryPool BufferPool { [DebuggerStepThrough][MethodImpl(MethodImplOptions.AggressiveInlining)] get; }
         internal StreamBlockIndex BlockIndex { [DebuggerStepThrough][MethodImpl(MethodImplOptions.AggressiveInlining)] get; }
+        internal ReaderBlockCache ReaderBlockCache { [DebuggerStepThrough][MethodImpl(MethodImplOptions.AggressiveInlining)] get; }
         internal StreamLogStateStorage StateStorage { [DebuggerStepThrough][MethodImpl(MethodImplOptions.AggressiveInlining)] get; }
         internal Packer Packer { [DebuggerStepThrough][MethodImpl(MethodImplOptions.AggressiveInlining)] get; }
 
@@ -142,6 +143,8 @@ namespace DataSpreads.StreamLogs
             var blockIndexFlags = StartupConfig.StreamBlockIndexFlags;
             var blockIndexSizeMb = Math.Max(StartupConfig.StreamBlockTableMaxSizeMb, 128);
             BlockIndex = new StreamBlockIndex(blockIndexPath, blockIndexSizeMb, blockIndexFlags, BufferPool, blockStorage);
+
+            ReaderBlockCache = new ReaderBlockCache(this);
 
             var logStateStoragePath = Path.Combine(DataStorePath, "log", "logstate");
 

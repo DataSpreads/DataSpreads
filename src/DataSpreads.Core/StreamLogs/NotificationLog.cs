@@ -362,15 +362,6 @@ namespace DataSpreads.StreamLogs
             public long StallCount;
             public long MaxStall;
 
-            private struct MissedUpdate
-            {
-                // ReSharper disable once NotAccessedField.Local
-                public ulong Version;
-
-                // ReSharper disable once NotAccessedField.Local
-                public Timestamp Timestamp;
-            }
-
             private readonly NotificationLog _log0;
             private readonly CancellationToken _ct;
             private readonly bool _doNotWaitForNew;
@@ -378,12 +369,12 @@ namespace DataSpreads.StreamLogs
             private ulong _currentKey;
             private StreamLogNotification _currentValue;
 
-            private StreamBlock _currentChunk;
+            private StreamBlock _currentBlock;
             // private int _currentChunkCapacity;
             // private ulong _currentChunkFirstVersion;
             // private ulong _lastMissed;
 
-            private Queue<MissedUpdate> _missedUpdates = new Queue<MissedUpdate>();
+            private Queue<ulong> _skippedSlots = new Queue<ulong>();
 
             public Reader(NotificationLog log0, CancellationToken ct, bool doNotWaitForNew = false)
             {
@@ -447,7 +438,7 @@ namespace DataSpreads.StreamLogs
                 }
                 var key = _currentKey + 1;
 
-                var position = Log0ItemPosition(_currentChunk.Pointer, (long)key, out _);
+                var position = Log0ItemPosition(_currentBlock.Pointer, (long)key, out _);
 
                 if (position != null)
                 {
@@ -740,8 +731,8 @@ namespace DataSpreads.StreamLogs
 
                 byte* position;
 
-                if (_currentChunk.IsValid
-                    && (position = Log0ItemPosition(_currentChunk.Pointer, (long)key, out _)) != null
+                if (_currentBlock.IsValid
+                    && (position = Log0ItemPosition(_currentBlock.Pointer, (long)key, out _)) != null
                    )
                 {
                     _currentKey = key;
@@ -786,7 +777,7 @@ namespace DataSpreads.StreamLogs
                     return false;
                 }
 
-                var prev = _currentChunk;
+                var prev = _currentBlock;
 
                 position = Log0ItemPosition(newChunk.Pointer, (long)key, out _);
 
@@ -800,7 +791,7 @@ namespace DataSpreads.StreamLogs
                 _currentKey = key;
                 _currentValue = (StreamLogNotification)ReadPosition(position, waitOnYield: true, out _);
 
-                _currentChunk = newChunk;
+                _currentBlock = newChunk;
 
                 if (prev.IsValid)
                 {
@@ -827,16 +818,16 @@ namespace DataSpreads.StreamLogs
                 get => _currentValue;
             }
 
-            public int MissedQueueLength => _missedUpdates.Count;
+            public int MissedQueueLength => _skippedSlots.Count;
 
             object IEnumerator.Current => Current;
 
             public void Dispose()
             {
-                if (_currentChunk.IsValid)
+                if (_currentBlock.IsValid)
                 {
 #pragma warning disable 618
-                    _currentChunk.DisposeFree();
+                    _currentBlock.DisposeFree();
 #pragma warning restore 618
                 }
             }
