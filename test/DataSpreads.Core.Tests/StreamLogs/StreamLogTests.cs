@@ -61,6 +61,12 @@ namespace DataSpreads.Tests.StreamLogs
         }
 
         [Test]
+        public void StreamBlockProxySize()
+        {
+            TypeLayout.PrintLayout<ReaderBlockCache.StreamBlockProxy>();
+        }
+
+        [Test]
         public void StreamLogCursorSize()
         {
             TypeLayout.PrintLayout<StreamLog.StreamLogCursor>();

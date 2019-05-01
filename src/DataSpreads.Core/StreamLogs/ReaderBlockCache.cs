@@ -25,9 +25,9 @@
  * and enjoy how fast and securely your data spreads to the World!
  */
 
-using DataSpreads.Storage;
 using Spreads;
 using Spreads.Collections.Concurrent;
+using Spreads.Threading;
 using System;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
@@ -71,7 +71,7 @@ namespace DataSpreads.StreamLogs
                 else
                 {
                     // CD.GetOrAdd factory is not atomic, lock manually.
-                    // Lock on SL, not a global object. This also helps 
+                    // Lock on SL, not a global object. This also helps
                     // to avoid a capturing lambda and the risk of collecting
                     // an object held only by a weak reference during that lambda return.
                     lock (streamLog)
@@ -84,9 +84,7 @@ namespace DataSpreads.StreamLogs
                         {
                             p = StreamBlockProxy.Create(blockKey, this);
 
-#pragma warning disable 618
-                            var sb = BlockIndex.TryRentIndexedStreamBlock(streamLog, record.BufferRef); // TODO review if we should pass record.Version
-#pragma warning restore 618
+                            var sb = streamLog.GetBlockFromRecord(record);
 
                             // Could set directly without SetStreamBlock
                             p.Block = sb;
@@ -100,6 +98,9 @@ namespace DataSpreads.StreamLogs
                         }
                     }
                 }
+
+                // will be null if cannot retain, then will start over
+                p = p?.TryRetain();
             }
 
             return p;
@@ -151,7 +152,7 @@ namespace DataSpreads.StreamLogs
             // Using lock in dispose and replace method does not affect
             // normal read operations.
             // 2. Public mutable field could be replaced by ref readonly property,
-            // but for now just avoid setting it other then in cache factory and 
+            // but for now just avoid setting it other then in cache factory and
             // SetStreamBlock method. It's hard to do by accident,
             // while access to SB is performance critical.
             public StreamBlock Block;
@@ -164,8 +165,11 @@ namespace DataSpreads.StreamLogs
             public static StreamBlockProxy Create(BlockKey key, ReaderBlockCache cache)
             {
                 var instance = _pool.Allocate();
+                ThrowHelper.AssertFailFast(AtomicCounter.GetIsDisposed(ref instance._rc), "Pooled proxy must be in disposed state.");
                 instance._key = key;
                 instance._cache = cache;
+                // cache owns one ref
+                instance._rc = 1;
                 return instance;
             }
 
@@ -177,23 +181,36 @@ namespace DataSpreads.StreamLogs
 
                 lock (this)
                 {
-                    var previous = Block;
-                    Block = newBlock;
-                    if (previous.IsValid)
+                    if (AtomicCounter.GetIsDisposed(ref _rc))
                     {
+                        // because we inside the lock that protects from concurrent call to dispose,
+                        // the proxy could be disposed by now and the new block is not needed
 #pragma warning disable 618
-                        previous.DisposeFree();
+                        newBlock.DisposeFree();
 #pragma warning restore 618
+                    }
+                    else
+                    {
+                        var previous = Block;
+                        Block = newBlock;
+                        if (previous.IsValid)
+                        {
+#pragma warning disable 618
+                            previous.DisposeFree();
+#pragma warning restore 618
+                        }
                     }
                 }
             }
 
+            /// <summary>
+            /// Null as false in Try... pattern.
+            /// </summary>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public StreamBlockProxy Retain()
+            public StreamBlockProxy TryRetain()
             {
-                var current = Interlocked.Increment(ref _rc);
-                ThrowHelper.AssertFailFast(current > 0, "current > 0");
-                return this;
+                var current = AtomicCounter.IncrementIfRetained(ref _rc);
+                return current <= 0 ? null : this;
             }
 
             public void Dispose()
@@ -217,9 +234,44 @@ namespace DataSpreads.StreamLogs
 
                 void DoDispose()
                 {
-                    var remaining = Interlocked.Decrement(ref _rc);
-                    ThrowHelper.AssertFailFast(remaining >= 0, "remaining >= 0"); // TODO replace with trace or add && disposing
-                    if (remaining == 0 || !disposing)
+                    if (!disposing)
+                    {
+                        // Cache has a weak reference, so finalizer could start running while a handle is still in the cache
+                        // As if _rc was 1 and we called DecrementIfOne - if successful, no resurrect is possible
+                        // because Retain uses IncrementIfRetained.
+
+                        var current = Volatile.Read(ref _rc);
+                        var existing = Interlocked.CompareExchange(ref _rc, 0, current);
+                        if (existing != current)
+                        {
+                            // Resurrected while we tried to set rc to zero.
+                            // What is rc was not 1? At some point all new users will
+                            // dispose the proxy and it will be in the cache with
+                            // positive rc but without GC root, then it will be
+                            // collected and finalized and will return to this
+                            // place where we will try to set rc to 0 again.
+                            ThrowHelper.AssertFailFast(existing > 1, "existing > 1 when resurrected");
+
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        var remaining = AtomicCounter.Decrement(ref _rc);
+                        if (remaining > 1)
+                        {
+                            return;
+                        }
+
+                        if (AtomicCounter.DecrementIfOne(ref _rc) != 0)
+                        {
+                            return;
+                        }
+                    }
+
+                    ThrowHelper.AssertFailFast(_rc == 0, "_rc must be 0 to proceed with proxy disposal");
+
+                    try
                     {
                         // remove self from cache
                         _cache._blocks.TryRemove(_key, out var handle);
@@ -227,22 +279,32 @@ namespace DataSpreads.StreamLogs
                         {
                             handle.Free();
                         }
+                    }
+                    finally
+                    {
+                        // If we are shutting down, e.g. unhandled exception in other threads
+                        // increase the chances we do release shared memory ref.
 
 #pragma warning disable 618
                         // ReSharper disable once InconsistentlySynchronizedField
                         Block.DisposeFree();
 #pragma warning restore 618
+                    }
 
-                        if (disposing)
-                        {
-                            GC.SuppressFinalize(this);
-                            // ReSharper disable once InconsistentlySynchronizedField
-                            Block = default;
-                            _key = default;
-                            _pool = default;
-                            _rc = default;
-                            _isSharedMemory = default;
-                        }
+                    // Do not pool finalized objects.
+                    // TODO (review) proxy does not have ref type fields,
+                    // probably could add to pool without thinking about GC/finalization order.
+                    // However, this case should be very rare (e.g. unhandled exception)
+                    // and we care about releasing RC of shared memory above all.
+                    if (disposing)
+                    {
+                        GC.SuppressFinalize(this);
+                        // ReSharper disable once InconsistentlySynchronizedField
+                        Block = default;
+                        _key = default;
+                        _pool = default;
+                        AtomicCounter.Dispose(ref _rc);
+                        _isSharedMemory = default;
                     }
                 }
             }

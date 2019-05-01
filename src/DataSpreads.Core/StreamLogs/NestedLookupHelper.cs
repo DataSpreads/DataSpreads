@@ -110,7 +110,7 @@ namespace DataSpreads.StreamLogs
                     comparer, dataSource);
             }
 
-        RETRY:
+            RETRY:
 
             if (!block.Equals(default))
             {
@@ -300,7 +300,7 @@ namespace DataSpreads.StreamLogs
                     dataSource);
             }
 
-        RETRY:
+            RETRY:
 
             if (!block.Equals(default))
             {

@@ -25,6 +25,7 @@
  * and enjoy how fast and securely your data spreads to the World!
  */
 
+using System;
 using Spreads;
 using Spreads.Buffers;
 using Spreads.DataTypes;
@@ -46,20 +47,20 @@ namespace DataSpreads.StreamLogs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal StreamBlock GetBlockFromRecord(StreamBlockRecord record)
         {
-            StreamBlock newActiveBlock;
+            StreamBlock block;
             // we cannot touch a block when it is stored
             if (record.BufferRef != default)
             {
 #pragma warning disable 618
-                newActiveBlock = StreamLogManager.BlockIndex.TryRentIndexedStreamBlock(this, record.BufferRef);
+                block = StreamLogManager.BlockIndex.TryRentIndexedStreamBlock(this, record.BufferRef);
 #pragma warning restore 618
 
-                if (newActiveBlock.IsValid || record.Version == StreamBlockIndex.ReadyBlockVersion)
+                if (block.IsValid || record.Version == StreamBlockIndex.ReadyBlockVersion)
                 {
-                    return newActiveBlock;
+                    return block;
                 }
 
-                // TODO review why this was needed
+                // TODO (!) review why this was needed, sometimes we get "cannot get block that should exists", probably this is the fix
                 //if (_streamLog.StreamLogManager.BlockIndex.TryGetValue(StreamLogId, record.Version, out record)
                 //    && record.BufferRef != default && !record.BufferRef.Flag
                 //)
@@ -68,15 +69,15 @@ namespace DataSpreads.StreamLogs
                 //}
             }
             // throw new NotImplementedException(); // TODO Storage
-            newActiveBlock =
+            block =
                     StreamLogManager
                     .BlockIndex
                     .BlockStorage
                     .TryGetStreamBlock((long)Slid, record.Version);
 
-            if (newActiveBlock.IsValid)
+            if (block.IsValid)
             {
-                return newActiveBlock;
+                return block;
             }
 
             FailCannotGetBlock();
@@ -88,53 +89,15 @@ namespace DataSpreads.StreamLogs
             }
         }
 
+        /// <summary>
+        /// Caches calls to <see cref="GetBlockFromRecord"/>.
+        /// </summary>
+        /// <param name="record"></param>
+        /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal ReaderBlockCache.StreamBlockProxy GetBlockProxyFromRecord(StreamBlockRecord record)
         {
-            StreamBlock newActiveBlock;
-            // we cannot touch a block when it is stored
-            if (record.BufferRef != default)
-            {
-
-
-
-
-#pragma warning disable 618
-                newActiveBlock = StreamLogManager.BlockIndex.TryRentIndexedStreamBlock(this, record.BufferRef);
-#pragma warning restore 618
-
-                if (newActiveBlock.IsValid || record.Version == StreamBlockIndex.ReadyBlockVersion)
-                {
-                    return newActiveBlock;
-                }
-
-                // TODO review why this was needed
-                //if (_streamLog.StreamLogManager.BlockIndex.TryGetValue(StreamLogId, record.Version, out record)
-                //    && record.BufferRef != default && !record.BufferRef.Flag
-                //)
-                //{
-                //    FailCannotGetChunk(record);
-                //}
-            }
-            // throw new NotImplementedException(); // TODO Storage
-            newActiveBlock =
-                StreamLogManager
-                    .BlockIndex
-                    .BlockStorage
-                    .TryGetStreamBlock((long)Slid, record.Version);
-
-            if (newActiveBlock.IsValid)
-            {
-                return newActiveBlock;
-            }
-
-            FailCannotGetBlock();
-            return default;
-
-            void FailCannotGetBlock()
-            {
-                ThrowHelper.FailFast($"Cannot get chunk that should exist: bufferRef {record.BufferRef}, version: {record.Version}");
-            }
+            return StreamLogManager.ReaderBlockCache.TryRentIndexedStreamBlockProxy(this, record);
         }
 
         public struct StreamLogCursor : ISpecializedCursor<ulong, DirectBuffer, StreamLogCursor> // TODO , ISpecializedCursor<Timestamp, DirectBuffer, StreamLogCursor>
@@ -691,10 +654,7 @@ namespace DataSpreads.StreamLogs
             // Only MoveAt/TryGet for Timestamp are implemented
             // using nested search extracted from BaseContainer.
 
-            // TODO maybe we should store SM here, less risks of missed decrement
-            // Also we could use thread pool for prefetch next blocks. With struct
-            // there is no object where to store a new block.
-            private ReaderBlockCache.StreamBlockProxy _currentBlockProxy;      // 16
+            private ReaderBlockCache.StreamBlockProxy _currentBlockProxy;      // 8
 
             internal readonly StreamLog StreamLog;     // 8
 
@@ -769,7 +729,7 @@ namespace DataSpreads.StreamLogs
                 if (_currentBlockProxy.Block.IsValid)
                 {
 #pragma warning disable 618
-                    _currentBlockProxy.DisposeFree();
+                    _currentBlockProxy.Dispose();
 #pragma warning restore 618
                 }
                 _currentBlockProxy = default;
@@ -803,6 +763,7 @@ namespace DataSpreads.StreamLogs
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool MoveAt(ulong key, Lookup direction)
             {
+#nullable enable
                 // keys are sequential
                 if (key == 0)
                 {
@@ -834,7 +795,8 @@ namespace DataSpreads.StreamLogs
                     direction = Lookup.GE;
                 }
 
-                if (_currentBlockProxy.IsValid && key >= _currentBlockProxy.FirstVersion && key <= _currentBlockProxy.CurrentVersion)
+                // TODO Review triple access to the Block field. Looks OK, only the last one is volatile and the value could only grow
+                if (_currentBlockProxy.Block.IsValid && key >= _currentBlockProxy.Block.FirstVersion && key <= _currentBlockProxy.Block.CurrentVersion)
                 {
                     _currentKey = key;
                     return true;
@@ -843,7 +805,7 @@ namespace DataSpreads.StreamLogs
                 Debug.Assert(direction != Lookup.GT && direction != Lookup.LT);
 
                 var prev = _currentBlockProxy;
-                StreamBlock newBlock = default;
+                ReaderBlockCache.StreamBlockProxy newProxy = default;
 
                 var activeBlockVersion = StreamLog.State.GetActiveBlockVersion();
 
@@ -859,36 +821,34 @@ namespace DataSpreads.StreamLogs
                     }
 
                     // active block must be valid
-                    newBlock = StreamLog.GetBlockFromRecord(record);
+                    newProxy = StreamLog.GetBlockProxyFromRecord(record);
 
-                    if (!newBlock.IsValid || key < newBlock.FirstVersion)
+                    if (!newProxy.Block.IsValid || key < newProxy.Block.FirstVersion)
                     {
                         ThrowHelper.FailFast("!newBlock.IsValid");
                     }
 
                     // only for LE we could lookup previous chunk
-                    if (newBlock.CountVolatile == 0 && direction != Lookup.LE)
+                    if (newProxy.Block.CountVolatile == 0 && direction != Lookup.LE)
                     {
-#pragma warning disable CS0618 // Type or member is obsolete
-                        newBlock.DisposeFree();
-#pragma warning restore CS0618 // Type or member is obsolete
+                        newProxy.Dispose();
                         return false;
                     }
                 }
 
-                if (!newBlock.IsValid)
+                if (newProxy == null || !newProxy.Block.IsValid)
                 {
                     if (BlockIndex.TryFindAt(StreamLogId, key, Lookup.LE,
                         out var record))
                     {
-                        newBlock = StreamLog.GetBlockFromRecord(record);
+                        newProxy = StreamLog.GetBlockProxyFromRecord(record);
                     }
                 }
 
-                if (newBlock.IsValid && key >= newBlock.FirstVersion)
+                if (newProxy != null && newProxy.Block.IsValid && key >= newProxy.Block.FirstVersion)
                 {
                     var found = false;
-                    if (key <= newBlock.CurrentVersion)
+                    if (key <= newProxy.Block.CurrentVersion)
                     {
                         found = true;
                         _currentKey = key;
@@ -896,16 +856,16 @@ namespace DataSpreads.StreamLogs
                     else if (direction == Lookup.LE)
                     {
                         found = true;
-                        _currentKey = newBlock.CurrentVersion;
+                        _currentKey = newProxy.Block.CurrentVersion;
                     }
 
                     if (found)
                     {
-                        _currentBlockProxy = newBlock;
-                        if (prev.IsValid)
+                        _currentBlockProxy = newProxy;
+                        if (prev != null && prev.Block.IsValid)
                         {
 #pragma warning disable 618
-                            prev.DisposeFree();
+                            prev.Dispose();
 #pragma warning restore 618
                         }
 
@@ -914,24 +874,30 @@ namespace DataSpreads.StreamLogs
                 }
 
 #pragma warning disable 618
-                newBlock.DisposeFree();
+                newProxy?.Dispose();
 #pragma warning restore 618
 
                 return false;
+#nullable restore
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool MoveAt(Timestamp key, Lookup direction)
             {
-                // TODO MA with TS should check current block before hitting the index
-                if (NestedLookupHelper.TryFindBlockAt(ref key, direction, out var sbwts, out int blockIndex, StreamLog))
-                {
-                    _currentBlockProxy = sbwts.Block;
-                    _currentKey = sbwts.Block.FirstVersion + (ulong)blockIndex;
-                    return true;
-                }
+                // TODO sort out the weird sbwts stuff, we only need IVector impl, maybe unsafe cast will just work
+                // Also we could afford MA to be slower than MN, things such struct copying matter only for MN,
+                // for other places its nice to have but not a big overhead.
+                throw new NotImplementedException();
 
-                return false;
+                //// TODO MA with TS should check current block before hitting the index
+                //if (NestedLookupHelper.TryFindBlockAt(ref key, direction, out var sbwts, out int blockIndex, StreamLog))
+                //{
+                //    _currentBlockProxy = sbwts.Block;
+                //    _currentKey = sbwts.Block.FirstVersion + (ulong)blockIndex;
+                //    return true;
+                //}
+
+                //return false;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1069,8 +1035,8 @@ namespace DataSpreads.StreamLogs
                 [MethodImpl(MethodImplOptions.AggressiveInlining)]
                 get
                 {
-                    Debug.Assert(_currentKey >= _currentBlockProxy.FirstVersion);
-                    return _currentBlockProxy.DangerousGet(checked((int)(_currentKey - _currentBlockProxy.FirstVersion)));
+                    Debug.Assert(_currentKey >= _currentBlockProxy.Block.FirstVersion);
+                    return _currentBlockProxy.Block.DangerousGet(checked((int)(_currentKey - _currentBlockProxy.Block.FirstVersion)));
                 }
             }
 
@@ -1113,7 +1079,7 @@ namespace DataSpreads.StreamLogs
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             internal bool MoveNextWithinChunk()
             {
-                if (_currentBlockProxy.CurrentVersion > _currentKey)
+                if (_currentBlockProxy.Block.CurrentVersion > _currentKey)
                 {
                     _currentKey = _currentKey + 1;
                     return true;
@@ -1132,7 +1098,7 @@ namespace DataSpreads.StreamLogs
             internal bool MovePreviousWithinChunk()
             {
                 _currentKey = _currentKey - 1;
-                Debug.Assert(_currentKey >= _currentBlockProxy.FirstVersion);
+                Debug.Assert(_currentKey >= _currentBlockProxy.Block.FirstVersion);
                 return true;
             }
         }

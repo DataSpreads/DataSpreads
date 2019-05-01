@@ -34,6 +34,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 // ReSharper disable ImpureMethodCallOnReadonlyValueField
 
@@ -91,9 +92,7 @@ namespace DataSpreads.StreamLogs
                 ThrowHelper.ThrowInvalidOperationException("StreamBlock values do not have timestamp.");
             }
 
-            var sbts = new StreamBlockWithTimestamp(this);
-
-            return VectorSearch.SortedSearch(ref sbts, 0, CountVolatile, value);
+            return VectorSearch.SortedSearch(ref Unsafe.As<StreamBlock, StreamBlockWithTimestamp>(ref Unsafe.AsRef(in this)), 0, CountVolatile, value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -104,16 +103,16 @@ namespace DataSpreads.StreamLogs
                 ThrowHelper.ThrowInvalidOperationException("StreamBlock values do not have timestamp.");
             }
 
-            var sbts = new StreamBlockWithTimestamp(this);
-
-            return VectorSearch.SortedLookup(ref sbts, 0, CountVolatile, value, direction);
+            return VectorSearch.SortedLookup(ref Unsafe.As<StreamBlock, StreamBlockWithTimestamp>(ref Unsafe.AsRef(in this)), 0, CountVolatile, value, direction);
         }
     }
 
+    [StructLayout(LayoutKind.Sequential)]
     internal readonly struct StreamBlockWithTimestamp : IVector<Timestamp>, IEquatable<StreamBlockWithTimestamp>
     {
         public readonly StreamBlock Block;
 
+        // TODO remove ctor, use Unsafe.As
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public StreamBlockWithTimestamp(StreamBlock block)
         {
