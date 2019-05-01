@@ -97,7 +97,7 @@ namespace DataSpreads.StreamLogs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal ReaderBlockCache.StreamBlockProxy GetBlockProxyFromRecord(StreamBlockRecord record)
         {
-            return StreamLogManager.ReaderBlockCache.TryRentIndexedStreamBlockProxy(this, record);
+            return BlockIndex.ReaderBlockCache.TryRentIndexedStreamBlockProxy(this, record);
         }
 
         public struct StreamLogCursor : ISpecializedCursor<ulong, DirectBuffer, StreamLogCursor> // TODO , ISpecializedCursor<Timestamp, DirectBuffer, StreamLogCursor>

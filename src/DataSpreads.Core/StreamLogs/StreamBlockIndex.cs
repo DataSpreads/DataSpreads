@@ -49,6 +49,8 @@ namespace DataSpreads.StreamLogs
         private readonly LMDBEnvironment _env;
         private readonly Database _blocksDb;
 
+        internal ReaderBlockCache ReaderBlockCache { [DebuggerStepThrough][MethodImpl(MethodImplOptions.AggressiveInlining)] get; }
+
         // internal Database _persistedWalPosDb;
         private readonly BlockMemoryPool _blockPool;
 
@@ -78,6 +80,8 @@ namespace DataSpreads.StreamLogs
                     DupSortPrefix = 64 * 64
                 }
             );
+
+            ReaderBlockCache = new ReaderBlockCache();
 
             // TODO Review &/| delete
             // OpenDbs();

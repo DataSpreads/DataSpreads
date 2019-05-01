@@ -44,19 +44,7 @@ namespace DataSpreads.StreamLogs
         // SBP has a single count in SB ref count.
 
         private readonly ConcurrentDictionary<BlockKey, GCHandle> _blocks = new ConcurrentDictionary<BlockKey, GCHandle>();
-        private readonly StreamLogManager _streamLogManager;
-
-        // private readonly Func<BlockKey,GCHandle> _factoryFuncX;
-
-        public ReaderBlockCache(StreamLogManager streamLogManager)
-        {
-            _streamLogManager = streamLogManager;
-            // _factoryFunc = HandleFactory;
-        }
-
-        private StreamBlockIndex BlockIndex => _streamLogManager.BlockIndex;
-        // private IStreamBlockStorage BlockStorage => _streamLogManager.BlockIndex.BlockStorage;
-
+        
         public StreamBlockProxy TryRentIndexedStreamBlockProxy(StreamLog streamLog, StreamBlockRecord record)
         {
             StreamBlockProxy p = null;
@@ -245,13 +233,16 @@ namespace DataSpreads.StreamLogs
                         if (existing != current)
                         {
                             // Resurrected while we tried to set rc to zero.
-                            // What is rc was not 1? At some point all new users will
+                            // What if rc was wrong and not 1? At some point all new users will
                             // dispose the proxy and it will be in the cache with
                             // positive rc but without GC root, then it will be
                             // collected and finalized and will return to this
                             // place where we will try to set rc to 0 again.
-                            ThrowHelper.AssertFailFast(existing > 1, "existing > 1 when resurrected");
+                            // TODO trace this condition, it indicates dropped proxies
+                            // From user code it could be possible only when manually using cursors
+                            // and forgetting to dispose them, so all blame is on users, but we should not fail.
 
+                            ThrowHelper.AssertFailFast(existing > 1, "existing > 1 when resurrected");
                             return;
                         }
                     }
