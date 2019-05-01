@@ -128,7 +128,7 @@ namespace DataSpreads.StreamLogs
 
         public sealed class StreamBlockProxy : IDisposable
         {
-            private static ObjectPool<StreamBlockProxy> _pool = new ObjectPool<StreamBlockProxy>(() => new StreamBlockProxy());
+            private static readonly ObjectPool<StreamBlockProxy> _pool = new ObjectPool<StreamBlockProxy>(() => new StreamBlockProxy());
 
             private BlockKey _key;
             private ReaderBlockCache _cache;
@@ -145,7 +145,7 @@ namespace DataSpreads.StreamLogs
             // while access to SB is performance critical.
             public StreamBlock Block;
 
-            private int _rc;
+            private int _rc = AtomicCounter.CountMask;
 
             private volatile bool _isSharedMemory;
 
@@ -293,7 +293,6 @@ namespace DataSpreads.StreamLogs
                         // ReSharper disable once InconsistentlySynchronizedField
                         Block = default;
                         _key = default;
-                        _pool = default;
                         AtomicCounter.Dispose(ref _rc);
                         _isSharedMemory = default;
                     }
