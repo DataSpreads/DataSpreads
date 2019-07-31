@@ -50,7 +50,7 @@ namespace DataSpreads.Buffers
         private readonly int _pageSize;
         private readonly int _maxBucketIndex;
         private SharedMemoryBucket[][] _buckets;
-        private DriveInfo _di;
+        private readonly DriveInfo _di;
 
         public SharedMemoryBuckets(string directoryPath, int pageSize = 4096, int maxBucketIndex = BufferRef.MaxBucketIdx)
         {

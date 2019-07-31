@@ -44,6 +44,8 @@ namespace DataSpreads.StreamLogs
 
     internal partial class StreamLog
     {
+        // TODO these 2 methods are better at SBI
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal StreamBlock GetBlockFromRecord(StreamBlockRecord record)
         {

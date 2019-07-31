@@ -42,14 +42,14 @@ namespace CrossProcess
         // This is the main goal to make such load stable - then the whole lib is stable.
         // One nasty thing is that RetainableMemory buffers still leak and are finalized randomly,
         // we throw when finalizing retained buffers which kills the app.
-        private static int StreamCount = 12; // Environment.ProcessorCount * 4;
+        private static int StreamCount = 2; // Environment.ProcessorCount * 4;
 
-        private const int ItemsPerStreamCount = 100_000_000;
+        private const int ItemsPerStreamCount = 10_000_000;
 
         public static async Task Main(string[] args)
         {
             // Print diagnostic info to console.
-            Trace.Listeners.Add(new ConsoleListener());
+            // Trace.Listeners.Add(new ConsoleListener());
 
             // Traces ctor stack of leaked buffers. Slow and should normally be off.
             Settings.DoDetectBufferLeaks = false;
@@ -99,7 +99,7 @@ namespace CrossProcess
                 else
                 {
                     // TODO Currently races in Packer when run from separate processes.
-#if XXX
+#if !XXX
                     var req = Requester();
                     var res = Responder();
                     await req.ConfigureAwait(false);

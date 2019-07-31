@@ -358,7 +358,7 @@ namespace DataSpreads.StreamLogs
             | MethodImplOptions.AggressiveOptimization
 #endif
         )]
-        internal static bool TryInitialize(DirectBuffer blockBuffer, 
+        internal static bool TryInitialize(DirectBuffer blockBuffer,
             StreamLogId slid,
             VersionAndFlags blockFlags,
             short itemFixedSize,
@@ -431,7 +431,7 @@ namespace DataSpreads.StreamLogs
                 WriteUnaligned<VersionAndFlags>(blockBuffer.Data + StreamBlockHeader.VersionAndFlagsOffset, blockFlags);
                 WriteUnaligned<int>(blockBuffer.Data + StreamBlockHeader.PayloadLengthOffset, blockBuffer.Length - StreamBlockHeader.Size);
                 WriteUnaligned<long>((blockBuffer.Data + StreamBlockHeader.InitTimestampOffset), (long)ProcessConfig.CurrentTime);
-                    
+
                 // Checksum is updated in-place on commit, but we must store initial value for validation
                 WriteUnaligned<uint>((blockBuffer.Data + StreamBlockHeader.ChecksumOffset), previousChecksum);
                 WriteUnaligned<uint>((blockBuffer.Data + StreamBlockHeader.PreviousChecksumOffset), previousChecksum);
@@ -1344,10 +1344,5 @@ namespace DataSpreads.StreamLogs
         }
 
         #endregion Throw Helpers
-    }
-
-    internal static class StreamLogChunkExtensions
-    {
-        // TODO Remove
     }
 }

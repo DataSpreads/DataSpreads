@@ -18,7 +18,7 @@
 
   <PropertyGroup>
     <!-- Set to True for auto incrementing build releases. Is set by scripts. -->
-    <AutoSuffix>True</AutoSuffix>
+    <AutoSuffix>False</AutoSuffix>
 
     <MMDDVersion Condition="'$(MMDDVersion)' == '' AND $(AutoSuffix)">$([System.DateTime]::Now.ToString(MMdd))</MMDDVersion>
     <PackageHHMMSSSuffix Condition="'$(PackageHHMMSSSuffix)' != ''">-$(PackageHHMMSSSuffix)</PackageHHMMSSSuffix>

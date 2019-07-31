@@ -36,11 +36,11 @@ using System.Threading;
 
 namespace DataSpreads.StreamLogs
 {
-    internal class ReaderBlockCache
+    internal class ReaderBlockCache : IDisposable
     {
         // GCHandle holds a weak reference to StreamBlockProxy.
         // Readers (SLCursors) keep a strong reference.
-        // When all readers go out of scope SBP is finalized.
+        // When all readers go out of scope SBP is finalized (but should be properly disposed).
         // SBP has a single count in SB ref count.
 
         private readonly ConcurrentDictionary<BlockKey, GCHandle> _blocks = new ConcurrentDictionary<BlockKey, GCHandle>();
@@ -94,6 +94,20 @@ namespace DataSpreads.StreamLogs
             return p;
         }
 
+        public void Dispose()
+        {
+            foreach (var kvp in _blocks)
+            {
+                if (kvp.Value.IsAllocated)
+                {
+                    if (kvp.Value.Target is StreamBlockProxy p && p.IsSharedMemory)
+                    {
+                        p.Dispose(disposing: false);
+                    }
+                }
+            }    
+        }
+
         public readonly struct BlockKey : IEquatable<BlockKey>
         {
             public readonly StreamLogId Slid;
@@ -145,9 +159,9 @@ namespace DataSpreads.StreamLogs
             // while access to SB is performance critical.
             public StreamBlock Block;
 
-            private int _rc = AtomicCounter.CountMask;
+            private int _rc = AtomicCounter.CountMask; // disposed state
 
-            private volatile bool _isSharedMemory;
+            internal volatile bool IsSharedMemory;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static StreamBlockProxy Create(BlockKey key, ReaderBlockCache cache)
@@ -192,7 +206,7 @@ namespace DataSpreads.StreamLogs
             }
 
             /// <summary>
-            /// Null as false in Try... pattern.
+            /// Returns null as false in Try... pattern.
             /// </summary>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public StreamBlockProxy TryRetain()
@@ -208,7 +222,7 @@ namespace DataSpreads.StreamLogs
 
             public void Dispose(bool disposing)
             {
-                if (!_isSharedMemory)
+                if (!IsSharedMemory)
                 {
                     DoDispose();
                 }
@@ -274,7 +288,7 @@ namespace DataSpreads.StreamLogs
                     finally
                     {
                         // If we are shutting down, e.g. unhandled exception in other threads
-                        // increase the chances we do release shared memory ref.
+                        // increase the chances we do release shared memory ref with try/finally.
 
 #pragma warning disable 618
                         // ReSharper disable once InconsistentlySynchronizedField
@@ -294,7 +308,7 @@ namespace DataSpreads.StreamLogs
                         Block = default;
                         _key = default;
                         AtomicCounter.Dispose(ref _rc);
-                        _isSharedMemory = default;
+                        IsSharedMemory = default;
                     }
                 }
             }
@@ -304,5 +318,7 @@ namespace DataSpreads.StreamLogs
                 Dispose(false);
             }
         }
+
+        
     }
 }

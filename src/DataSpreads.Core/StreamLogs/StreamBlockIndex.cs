@@ -129,6 +129,7 @@ namespace DataSpreads.StreamLogs
             }
         }
 
+        // SBM X
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool GetIsCompleted(StreamLogId streamLogId)
         {
@@ -1892,6 +1893,7 @@ namespace DataSpreads.StreamLogs
         // ReSharper disable once UnusedParameter.Local
         private void Dispose(bool disposing)
         {
+            ReaderBlockCache.Dispose();
             // _persistedWalPosDb?.Dispose();
             _blocksDb?.Dispose();
             _env?.Dispose();

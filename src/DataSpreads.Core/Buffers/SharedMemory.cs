@@ -25,6 +25,8 @@
  * and enjoy how fast and securely your data spreads to the World!
  */
 
+#nullable enable
+
 using DataSpreads.StreamLogs;
 using Spreads;
 using Spreads.Buffers;
@@ -36,7 +38,6 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
-using Spreads.Serialization;
 using static System.Runtime.CompilerServices.Unsafe;
 
 #pragma warning disable 618
@@ -827,7 +828,7 @@ namespace DataSpreads.Buffers
         #region Lifecycle
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static SharedMemory Create(DirectBuffer nativeBuffer, BufferRef bufferRef, SharedMemoryPool pool)
+        internal static SharedMemory Create(DirectBuffer nativeBuffer, BufferRef bufferRef, SharedMemoryPool? pool)
         {
             var memoryBuffer = ObjectPool.Allocate();
 
@@ -839,7 +840,7 @@ namespace DataSpreads.Buffers
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void Init(DirectBuffer nativeBuffer, BufferRef bufferRef, SharedMemoryPool pool)
+        private void Init(DirectBuffer nativeBuffer, BufferRef bufferRef, SharedMemoryPool? pool)
         {
             _isNativeWithHeader = true;
             // after _isNativeWithHeader is set _counterOrReserved is not used for counter and could be reused for other purposes.

@@ -50,7 +50,7 @@ namespace DataSpreads.StreamLogs
         internal long StaleVersionCount;
 
         /// <summary>
-        /// This stores previous block or prepared next (TBD).
+        /// This stores previous block (or prepared next, TBD).
         /// </summary>
         private readonly ConcurrentDictionary<ulong, StreamBlock> _blocks = new ConcurrentDictionary<ulong, StreamBlock>();
 
@@ -60,7 +60,7 @@ namespace DataSpreads.StreamLogs
             _ = State.TryAcquireLock(streamLogManager.Wpid, streamLogManager.ProcessConfig);
             if (!Init())
             {
-                RotateActiveBlock(1, default, StreamLogManager.MaxBufferSize);
+                RotateActiveBlock(nextVersion: 1, nextTimestamp: default, StreamLogManager.MaxBufferSize);
             }
             _ = State.TryReleaseLock(streamLogManager.Wpid);
 
@@ -113,7 +113,9 @@ namespace DataSpreads.StreamLogs
             {
                 FailAppendEmptyPayload();
             }
+
             AGAIN:
+
             byte* position;
             // ReSharper disable once ImpureMethodCallOnReadonlyValueField
             var version = State.IncrementLog0Version();
@@ -128,16 +130,16 @@ namespace DataSpreads.StreamLogs
                 }
             }
 
+            if (AdditionalCorrectnessChecks.Enabled)
+            {
+                if (Volatile.Read(ref *(ulong*)(position)) != 0)
+                {
+                    ThrowHelper.FailFast("Attempted to write to non-empty Log0 position");
+                }
+            }
+
             if (IntPtr.Size == 8)
             {
-                if (AdditionalCorrectnessChecks.Enabled)
-                {
-                    if (Volatile.Read(ref *(ulong*)(position)) != 0)
-                    {
-                        ThrowHelper.FailFast("Attempted to write to non-empty Log0 position");
-                    }
-                }
-
                 Volatile.Write(ref *(ulong*)(position), ulongPayload);
             }
             else
@@ -165,7 +167,7 @@ namespace DataSpreads.StreamLogs
         }
 
         /// <summary>
-        /// The version is older than the previous block.
+        /// The version is older than the first version of the block before the active one.
         /// </summary>
         /// <param name="version"></param>
         /// <returns></returns>
@@ -332,7 +334,7 @@ namespace DataSpreads.StreamLogs
                     ThrowHelper.FailFast("Log0 is not archived");
                 }
             }
-
+            
 #pragma warning disable 618
             return StreamLogManager.BlockIndex.TryRentIndexedStreamBlock(this, record.BufferRef);
 #pragma warning restore 618
@@ -370,11 +372,8 @@ namespace DataSpreads.StreamLogs
             private StreamLogNotification _currentValue;
 
             private StreamBlock _currentBlock;
-            // private int _currentChunkCapacity;
-            // private ulong _currentChunkFirstVersion;
-            // private ulong _lastMissed;
 
-            private Queue<ulong> _skippedSlots = new Queue<ulong>();
+            private readonly Queue<ulong> _skippedSlots = new Queue<ulong>();
 
             public Reader(NotificationLog log0, CancellationToken ct, bool doNotWaitForNew = false)
             {
@@ -384,7 +383,7 @@ namespace DataSpreads.StreamLogs
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private ulong TryReadPosition(byte* position)
+            private static ulong TryReadPosition(byte* position)
             {
                 if (IntPtr.Size == 8)
                 {

@@ -49,9 +49,9 @@ namespace DataSpreads.Buffers
         // in the default case of block memory we need to do additional work.
         // Add a delegate that returns true if BufferRef could be returned to FreeList.
 
-        private Wpid _wpid;
-        private int _pageSize;
-        private long _maxTotalSize;
+        private readonly Wpid _wpid;
+        private readonly int _pageSize;
+        private readonly long _maxTotalSize;
         private long _lastTotalSize;
 
         /// <summary>
@@ -68,14 +68,14 @@ namespace DataSpreads.Buffers
 
         // TODO this is all internal with very limited usage, but refactor
 
-        public BufferRefAllocator(string directoryPath, LMDBEnvironmentFlags envFlags, Wpid wpid, int pageSize = 4096, long maxTotalSize = 64L * 1024 * 1024 * 1024)
+        public BufferRefAllocator(string directoryPath, LMDBEnvironmentFlags envFlags, Wpid wpid, int pageSize = 4096, long maxTotalSize = 64L * 1024 * 1024 * 1024, uint envSizeMb = 128)
         {
             _wpid = wpid;
             _pageSize = pageSize;
             _maxTotalSize = maxTotalSize;
 
             // TODO Log size to settings. Also handle MapFull later and reduce size.
-            SetupEnv(directoryPath, 128, envFlags);
+            SetupEnv(directoryPath, envSizeMb, envFlags);
             InitDbs();
         }
 

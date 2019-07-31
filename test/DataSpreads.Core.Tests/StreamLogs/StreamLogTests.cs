@@ -63,7 +63,7 @@ namespace DataSpreads.Tests.StreamLogs
         [Test]
         public void StreamBlockProxySize()
         {
-            TypeLayout.PrintLayout<ReaderBlockCache.StreamBlockProxy>();
+            TypeLayout.PrintLayout<StreamBlockProxy>();
         }
 
         [Test]

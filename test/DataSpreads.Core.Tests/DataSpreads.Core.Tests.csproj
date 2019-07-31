@@ -10,7 +10,7 @@
         <PackageReference Include="Microsoft.CSharp" Version="4.6.0-preview1-27018-01" />
         <PackageReference Include="Nerdbank.Streams" Version="2.1.37" />
         <PackageReference Include="ObjectLayoutInspector" Version="0.1.1" />
-        <PackageReference Include="Spreads.Core" Version="2019.0.412" />
+        <PackageReference Include="Spreads.Core" Version="2019.0.415-build142424" />
         <PackageReference Include="System.Numerics.Vectors" Version="4.6.0-preview1-27018-01" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.0.1" />
         <PackageReference Include="NUnit" Version="3.11.0" />
