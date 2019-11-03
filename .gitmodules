@@ -1,0 +1,4 @@
+[submodule "lib/Spreads"]
+	path = lib/Spreads
+	url = git@github.com:Spreads/Spreads.git
+	branch = master
