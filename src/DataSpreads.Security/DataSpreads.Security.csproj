@@ -8,7 +8,10 @@
     <OutputType>Library</OutputType>   
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="libsodium" Version="1.0.17" />
-    <PackageReference Include="Spreads.Core" Version="2019.0.415-build142424" />
+    <PackageReference Include="Spreads.Core" Version="2020.0.*" Condition=" !Exists ( '..\..\lib\Spreads\src\Spreads.Core\Spreads.Core.csproj' ) " />
+    <PackageReference Include="libsodium" Version="1.0.17.1" />
+  </ItemGroup>
+  <ItemGroup  Condition=" Exists ( '..\..\lib\Spreads\src\Spreads.Core\Spreads.Core.csproj' ) ">
+    <ProjectReference Include="..\..\lib\Spreads\src\Spreads.Core\Spreads.Core.csproj" />
   </ItemGroup>
 </Project>

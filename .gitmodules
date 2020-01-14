@@ -1,4 +1,12 @@
 [submodule "lib/Spreads"]
 	path = lib/Spreads
-	url = git@github.com:Spreads/Spreads.git
+	url = https://github.com/Spreads/Spreads.git
 	branch = master
+[submodule "lib/Spreads.LMDB"]
+	path = lib/Spreads.LMDB
+	url = https://github.com/Spreads/Spreads.LMDB.git
+	branch = master
+[submodule "lib/Spreads.SQLite"]
+	path = lib/Spreads.SQLite
+	url = https://github.com/Spreads/Spreads.SQLite.git
+	branch = Spreads

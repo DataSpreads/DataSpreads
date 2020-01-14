@@ -42,7 +42,7 @@ namespace DataSpreads
 {
     // TODO finalize/dispose
 
-    public struct TimeStreamCursor<T> : ISpecializedCursor<Timestamp, T, TimeStreamCursor<T>>
+    public struct TimeStreamCursor<T> : ICursor<Timestamp, T, TimeStreamCursor<T>>
     {
         internal StreamLog.StreamLogCursor Inner;
         private (bool, Timestamped<T>) _currentValue;
@@ -276,7 +276,7 @@ namespace DataSpreads
         }
     }
 
-    public struct DataStreamCursor<T> : ISpecializedCursor<ulong, Timestamped<T>, DataStreamCursor<T>>
+    public struct DataStreamCursor<T> : ICursor<ulong, Timestamped<T>, DataStreamCursor<T>>
     {
         internal StreamLog.StreamLogCursor Inner;
 
@@ -513,7 +513,7 @@ namespace DataSpreads
         }
     }
 
-    public readonly struct DataStream<T> : ISpecializedSeries<ulong, Timestamped<T>, DataStreamCursor<T>>
+    public readonly struct DataStream<T> : ISeries<ulong, Timestamped<T>, DataStreamCursor<T>>
     {
         private readonly Series<ulong, Timestamped<T>, DataStreamCursor<T>> _series;
         private readonly Metadata _metadata;

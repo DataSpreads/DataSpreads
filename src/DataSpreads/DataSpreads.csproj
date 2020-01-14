@@ -8,9 +8,6 @@
     <OutputType>Library</OutputType>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Spreads" Version="2019.0.415-build142424" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\DataSpreads.Core\DataSpreads.Core.csproj" />
   </ItemGroup>
 </Project>

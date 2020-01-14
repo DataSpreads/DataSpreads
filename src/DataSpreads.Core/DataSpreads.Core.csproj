@@ -18,13 +18,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Spreads.Core" Version="2020.0.*" Condition=" !Exists ( '..\..\lib\Spreads\src\Spreads.Core\Spreads.Core.csproj' ) " />
+    <PackageReference Include="Spreads.LMDB" Version="2020.0.*" Condition=" !Exists ( '..\..\lib\Spreads.LMDB\src\Spreads.LMDB\Spreads.LMDB.csproj' ) " />
+    <PackageReference Include="Spreads.SQLite" Version="2020.1.*" Condition=" !Exists ( '..\..\lib\Spreads.SQLite\src\Spreads.SQLite\Spreads.SQLite.csproj' ) " />
     <PackageReference Include="Dapper" Version="1.60.6" />
-    <PackageReference Include="Spreads" Version="2019.0.415-build142424" />
-    <PackageReference Include="Spreads.LMDB" Version="2019.0.412" />
-    <PackageReference Include="Spreads.SQLite" Version="2019.1.412" />
   </ItemGroup>
-
   <ItemGroup>
+    <ProjectReference Include="..\..\lib\Spreads\src\Spreads.Core\Spreads.Core.csproj" Condition=" Exists ( '..\..\lib\Spreads\src\Spreads.Core\Spreads.Core.csproj' ) "/>
+    <ProjectReference Include="..\..\lib\Spreads.LMDB\src\Spreads.LMDB\Spreads.LMDB.csproj" Condition=" Exists ( '..\..\lib\Spreads.LMDB\src\Spreads.LMDB\Spreads.LMDB.csproj' ) " />
+    <ProjectReference Include="..\..\lib\Spreads.SQLite\src\Spreads.SQLite\Spreads.SQLite.csproj" Condition=" Exists ( '..\..\lib\Spreads.SQLite\src\Spreads.SQLite\Spreads.SQLite.csproj' ) "/>
+    <ProjectReference Include="..\..\lib\Spreads\src\SpreadsX\SpreadsX.csproj" />
     <ProjectReference Include="..\DataSpreads.Security\DataSpreads.Security.csproj" />
   </ItemGroup>
 
